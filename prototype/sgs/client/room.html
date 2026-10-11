@@ -259,8 +259,8 @@ const lbManual=new Set(); // 吕布登记:哪些槽位(seat:ci)切到"手填牌�
 const draft={}; // seat -> [{s,r,n}]  登记草稿
 
 /* ============ 武将 / 工具注册表 ============ */
-const GENERALS={ lvbu:{name:"魔吕布"}, nanhua:{name:"南华老仙"}, xunyou:{name:"族荀攸"}, huangyueying:{name:"谋黄月英"}, caocao:{name:"魔曹操"}, yuanji:{name:"袁姬"}, zhongyan:{name:"钟琰"}, simayi:{name:"魔司马懿"}, dongzhao:{name:"谋董昭"}, shensunquan:{name:"神孙权"}, diaochan:{name:"魔貂蝉"}, sunquan:{name:"魔孙权"}, dianwei:{name:"神典韦"}, lijue:{name:"李傕"}, xurong:{name:"徐荣"}, xushi:{name:"SP徐氏"}, guozhao:{name:"郭照"}, peixiu:{name:"裴秀"}, puyuan:{name:"蒲元"}, caoying:{name:"曹婴"}, wangmingshan:{name:"族王明山"}, jiachong:{name:"贾充"}, zuluyusheng:{name:"族陆郁生"}, mouchengyu:{name:"谋程昱"} };
-const hasTool=g=>g==="lvbu"||g==="nanhua"||g==="xunyou"||g==="huangyueying"||g==="caocao"||g==="yuanji"||g==="zhongyan"||g==="simayi"||g==="dongzhao"||g==="shensunquan"||g==="diaochan"||g==="sunquan"||g==="dianwei"||g==="lijue"||g==="xurong"||g==="xushi"||g==="guozhao"||g==="peixiu"||g==="puyuan"||g==="caoying"||g==="wangmingshan"||g==="jiachong"||g==="zuluyusheng"||g==="mouchengyu";
+const GENERALS={ lvbu:{name:"魔吕布"}, nanhua:{name:"南华老仙"}, xunyou:{name:"族荀攸"}, huangyueying:{name:"谋黄月英"}, caocao:{name:"魔曹操"}, yuanji:{name:"袁姬"}, zhongyan:{name:"钟琰"}, simayi:{name:"魔司马懿"}, dongzhao:{name:"谋董昭"}, shensunquan:{name:"神孙权"}, diaochan:{name:"魔貂蝉"}, sunquan:{name:"魔孙权"}, dianwei:{name:"神典韦"}, lijue:{name:"李傕"}, xurong:{name:"徐荣"}, xushi:{name:"SP徐氏"}, guozhao:{name:"郭照"}, peixiu:{name:"裴秀"}, puyuan:{name:"蒲元"}, caoying:{name:"曹婴"}, wangmingshan:{name:"族王明山"}, jiachong:{name:"贾充"}, zuluyusheng:{name:"族陆郁生"}, mouchengyu:{name:"谋程昱"}, shenzhangjiao:{name:"神张角"}, xielingyu:{name:"谢灵毓"} };
+const hasTool=g=>g==="lvbu"||g==="nanhua"||g==="xunyou"||g==="huangyueying"||g==="caocao"||g==="yuanji"||g==="zhongyan"||g==="simayi"||g==="dongzhao"||g==="shensunquan"||g==="diaochan"||g==="sunquan"||g==="dianwei"||g==="lijue"||g==="xurong"||g==="xushi"||g==="guozhao"||g==="peixiu"||g==="puyuan"||g==="caoying"||g==="wangmingshan"||g==="jiachong"||g==="zuluyusheng"||g==="mouchengyu"||g==="shenzhangjiao"||g==="xielingyu";
 // 每个工具:view(seat)->HTML,bind(seat,q)->挂事件。TOOLS 在下方函数声明后其引用已 hoist。
 const TOOLS={ lvbu:{view:s=>viewLvbuTool(s),bind:(s,q)=>bindLvbu(s,q)},
              nanhua:{view:s=>viewNanhuaTool(s),bind:(s,q)=>bindNanhua(s,q)},
@@ -281,6 +281,8 @@ const TOOLS={ lvbu:{view:s=>viewLvbuTool(s),bind:(s,q)=>bindLvbu(s,q)},
              jiachong:{view:s=>viewJcTool(s),bind:(s,q)=>bindJc(s,q)},
              zuluyusheng:{view:s=>viewLysTool(s),bind:(s,q)=>bindLys(s,q)},
              mouchengyu:{view:s=>viewMcyTool(s),bind:(s,q)=>bindMcy(s,q)},
+             shenzhangjiao:{view:s=>viewZjTool(s),bind:(s,q)=>bindZj(s,q)},
+             xielingyu:{view:s=>viewXlyTool(s),bind:(s,q)=>bindXly(s,q)},
              xurong:{view:s=>viewXrTool(s),bind:(s,q)=>bindXr(s,q)},
              xushi:{view:s=>viewXsTool(s),bind:(s,q)=>bindXs(s,q)},
              guozhao:{view:s=>viewGzTool(s),bind:(s,q)=>bindGz(s,q)},
@@ -704,11 +706,23 @@ function renderDeal(){
     }
     return h+`</div>`;
   };
+  // 先选先亮的人(君主/明忠/两主帅)已亮出的武将:在每个人的选将弹层里直接看得到,并可展开技能(用户 2026-10-10:不用退出弹层再查)
+  let firstHtml="";
+  for(const fn of firsts){
+    const fs=d.seats[fn]; if(!fs||!fs.pick||!fs.final||fn===dealSeat) continue;
+    const hero=HERO_BY_ID.get(fs.pick.heroId), open=dealOpen===-fn; // 用负座位号当展开 key,避免与候选里同一武将的展开状态撞车
+    const fc=hero?(hero.factionSelectable?"shen":(FCLS[hero.faction]||"")):"";
+    firstHtml+=`<div class="dopt" style="border-color:var(--seal)"><img class="dava" src="${esc(hero&&hero.avatar||"")}" onerror="this.style.visibility='hidden'"/>`
+      +`<span class="grow"><span style="font-size:12px;color:var(--seal)">${esc(lt)} · 座位 ${fn} 已亮出</span><br><b>${esc(fs.pick.name)}</b>${hero?`<span class="fc ${fc}">${esc(hero.factionSelectable?"神":hero.faction||"?")}</span> <span style="font-size:12px;color:var(--ink-soft)">${hero.hp||"?"}血</span>`:""}</span>`
+      +(hero?`<button class="gold btn-skill" data-dfirst="${fn}">${open?"收起":"技能"}</button>`:"")+`</div>`
+      +(open&&hero?`<div class="dskills">${hero.characteristic?`<div class="hint" style="margin:0 0 6px">特点:${esc(hero.characteristic)}</div>`:""}${cardWarnHtml(hero)}${skillsHtml(hero.skills)}${derivedSkillsHtml(hero)}${derivedCardsHtml(hero)}</div>`:"");
+  }
   const idx=me.slots.map((s,i)=>i), lordIdx=idx.filter(i=>me.slots[i].src==="lord"), handIdx=idx.filter(i=>me.slots[i].src!=="lord");
   const sc=$("#modal .sheet"), keep=sc?sc.scrollTop:0; // 刷新不跳回顶部
   $("#modal").innerHTML=`<div class="mask" data-mclose="1"><div class="sheet" style="max-height:92vh;overflow:auto">
     <h2>选将 · 座位 ${dealSeat}${isLord?`<span class="lb" style="font-size:11px;color:var(--seal);border:1px solid var(--seal);border-radius:4px;padding:0 5px">${lt}</span>`:""}<span class="x" data-mclose="1">×</span></h2>
     <div style="margin-bottom:10px">${st}</div>
+    ${firstHtml?`<div class="dsec">已亮出</div><div class="dslot" style="margin-bottom:8px">${firstHtml}</div>`:""}
     ${lordIdx.length?`<div class="dsec">${lt}专属 · 主公技候选 ${lordIdx.length} 个(不可换)</div>`+lordIdx.map(i=>slotHtml(me.slots[i],i)).join(""):""}
     <div class="dsec">${lordIdx.length?"普通候选":"你的候选"} ${handIdx.length} 个(起手的各可换一次)</div>
     ${handIdx.map(i=>slotHtml(me.slots[i],i)).join("")}</div></div>`;
@@ -716,6 +730,7 @@ function renderDeal(){
   document.querySelectorAll("#modal [data-mclose]").forEach(b=>b.onclick=e=>{if(e.target===b){closeModal();}});
   const mq=s=>document.querySelectorAll("#modal "+s);
   mq("[data-dskill]").forEach(b=>b.onclick=()=>{const id=+b.dataset.dskill;dealOpen=dealOpen===id?null:id;renderDeal();});
+  mq("[data-dfirst]").forEach(b=>b.onclick=()=>{const k=-(+b.dataset.dfirst);dealOpen=dealOpen===k?null:k;renderDeal();});
   mq("[data-dswap]").forEach(b=>b.onclick=()=>send({type:"dealSwap",seatNo:dealSeat,slot:+b.dataset.dswap})); // 不二次确认(用户 2026-10-02:连点两下费劲)
   mq("[data-dpick]").forEach(b=>b.onclick=()=>{
     if(isLord&&!multi&&!confirm("选定「"+b.dataset.dname+"」?\n"+lt+"选定后立即亮出,不能再改。"))return;
@@ -993,8 +1008,27 @@ function viewRoomAdmin(){
   return `<div class="card"><h2>房间设置</h2>
     <div class="hint">房间在最后一次操作 <b>2 小时</b>后自动解散 —— 所有人锁屏 / 离开页面也不会立刻消失,回来还在。</div>
     <div class="row" style="margin-top:8px"><a href="/pool" target="_blank" rel="noopener" style="font-size:13px;color:var(--ink-soft)">🗂 将池编辑(各环境白名单 / 黑名单)→</a></div>
+    <div class="row" style="margin-top:8px"><button class="ghost grow" data-history="1">📜 历史对局(谁选了什么武将)</button></div>
     <div class="row" style="margin-top:8px"><button class="ghost grow" data-newgame="1">🔄 新一局(清空全场武将与身份,座位不动)</button></div>
     <div class="row" style="margin-top:8px"><button class="ghost grow" data-disband="1" style="color:var(--seal);border-color:var(--seal)">🗑 解散房间(所有人退出,不可恢复)</button></div></div>`;
+}
+// 历史对局:服务端 SgsConfigDO 存的每局快照(房间 DO 每次变更后 upsert;只有 时间/房间/模式/每座位 玩家+武将+亮明后的身份,不记牌)
+function openHistory(){
+  $("#modal").innerHTML=`<div class="mask" data-mclose="1"><div class="sheet" style="max-height:92vh;overflow:auto"><h2>历史对局<span class="x" data-mclose="1">×</span></h2><div class="hint">读取中…</div></div></div>`;
+  maskClose();
+  fetch("/api/history",{cache:"no-store"}).then(r=>r.ok?r.json():Promise.reject(r.status)).then(d=>{
+    const list=d.list||[], box=$("#modal .sheet"); if(!box) return;
+    const fmt=t=>{const x=new Date(t);const p=n=>String(n).padStart(2,"0");return `${x.getFullYear()}-${p(x.getMonth()+1)}-${p(x.getDate())} ${p(x.getHours())}:${p(x.getMinutes())}`;};
+    let h=`<h2>历史对局<span class="tag">${list.length} 局 · 保留 ${d.keep} 局 / ${d.days} 天</span><span class="x" data-mclose="1">×</span></h2>`;
+    h+=`<div class="hint" style="margin:0 0 8px">只记每局谁选了什么武将(和全部亮明后的身份),不记牌。本房间的标「本房」。</div>`;
+    if(!list.length) h+=`<div class="hint">还没有记录。有人选定武将后自动记一笔。</div>`;
+    for(const r of list){
+      const mine=state&&r.room===state.roomCode;
+      h+=`<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div style="font-size:12px;color:var(--ink-soft)">${fmt(r.t0)}${r.t&&r.t-r.t0>60000?" → "+fmt(r.t).slice(11):""} · 房间 ${esc(r.room)}${mine?" <span class='lb' style='font-size:10px'>本房</span>":""}${r.mode?" · <b>"+esc(r.mode)+"</b>":""} · ${r.seats.filter(s=>s.general).length} 人</div>`
+        +`<div style="display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:4px;font-size:13px">`+r.seats.map(s=>`<span><span style="color:var(--ink-soft)">${s.n}</span> ${esc(s.player||"—")}${s.general?" · <b>"+esc(s.general)+"</b>":""}${s.role?" <span class='kb' style='font-size:10px'>"+esc(s.role)+"</span>":""}</span>`).join("")+`</div></div>`;
+    }
+    box.innerHTML=h; maskClose();
+  }).catch(()=>{const box=$("#modal .sheet"); if(box) box.innerHTML=`<h2>历史对局<span class="x" data-mclose="1">×</span></h2><div class="hint">读取失败(worker 还没更新?)</div>`; maskClose();});
 }
 // 天恩待选:若有孙权对我持有的座位发动了天恩·不同项,返回 {sqSeat,target} 供全局横幅提示
 function sqPendingForMe(){
@@ -1578,6 +1612,7 @@ function bindAll(){
   q("[data-tejump]").forEach(b=>b.onclick=()=>{focus=+b.dataset.tejump;render();});
   q("[data-pick]").forEach(b=>b.onclick=()=>openHeroPicker(+b.dataset.pick));
   q("[data-banview]").forEach(b=>b.onclick=()=>previewHero(+b.dataset.banview));
+  q("[data-history]").forEach(b=>b.onclick=()=>openHistory());
   q("[data-newgame]").forEach(b=>b.onclick=()=>{if(confirm("开新一局?\n全场武将(含线上发将锁定的)、身份、进行中的发将都会清空;座位和持有者不动。"))send({type:"newGame"});});
   // 身份:发放设置 / 我的身份 / 疑似身份标记 / 全部亮明 / 清除
   q("[data-art]").forEach(b=>b.onclick=()=>openArt(+b.dataset.art)); // 立绘:点座位头像
@@ -2879,6 +2914,69 @@ function bindDw(dw,q){
 
 /* ---------- 族陆郁生工具(拾昔:每花色首张单目标普通锦囊台账;全公开)---------- */
 // 常见单目标普通锦囊(下拉便捷项;不在表里的可手填,不做校验——扩展/衍生锦囊照录)
+/* ---------- 神张角:异兆「黄」计数器(全公开)。使用/打出牌后按点数加黄;十位数变了提示摸一张。肆军=弃置所有黄 ---------- */
+function viewZjTool(zj){
+  const ts=zj.toolState||{}, iAm=state.youHold.includes(zj.seatNo), huang=ts.huang||0;
+  const RK=["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+  let h=`<div class="card"><h2>神张角 · 异兆<span class="tag">「黄」计数 · 全公开</span></h2>`;
+  h+=`<div class="hint">锁定技:使用或打出牌结算结束后,获得等同于此牌<b>点数</b>的「黄」;若「黄」数的<b>十位数</b>因此改变,摸一张牌。点牌的点数即可记。</div>`;
+  h+=`<div style="text-align:center;margin:10px 0 4px"><div style="font-size:12px;color:var(--ink-soft)">当前「黄」</div><div style="font-family:var(--display);font-weight:800;font-size:44px;color:#b8860b;line-height:1.1">${huang}</div>`
+    +`<div style="font-size:12px;color:var(--ink-soft)">十位数 <b>${Math.floor(huang/10)}</b> · 再加 <b>${10-huang%10}</b> 点就进位(摸牌)</div>`
+    +(ts.lastDraw===true?`<div style="margin-top:6px;font-weight:700;color:var(--seal)">✦ 十位数变了 → 摸一张牌</div>`:ts.lastDraw===false?`<div class="hint" style="margin:6px 0 0">上一张没进位,不摸</div>`:"")+`</div>`;
+  if(iAm){
+    h+=`<div class="hint" style="margin:6px 0 4px">使用/打出的牌点数:</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">`
+      +RK.map((r,i)=>`<button data-zjadd="${i+1}" style="padding:8px 0;font-weight:700">${r}</button>`).join("")+`</div>`;
+    h+=`<div class="row" style="margin-top:10px;gap:6px"><button class="ghost" data-zjundo="1" style="font-size:12px"${(ts.hist||[]).length?"":" disabled"}>撤销上一张</button>`
+      +`<button class="ghost" data-zjset="1" style="font-size:12px">手动校正</button><span class="grow"></span>`
+      +`<button data-zjclear="1" style="font-size:12px;border-color:var(--seal);color:var(--seal)">肆军 · 弃置所有黄</button></div>`;
+    h+=`<div class="hint" style="margin-top:8px">肆军:准备阶段若「黄」数大于牌堆剩余牌数,可弃置所有「黄」并亮牌(亮牌线下翻;这里只把计数清零)。</div>`;
+  }else h+=`<div class="hint">神张角本人操作,你只读。</div>`;
+  h+=`</div>`;
+  if(ts.log&&ts.log.length) h+=`<div class="card"><h2>记录</h2><div class="loglist">`+ts.log.slice(0,20).map(l=>`<div>${esc(l)}</div>`).join("")+`</div></div>`;
+  return h;
+}
+function bindZj(zj,q){
+  const Z=zj.seatNo, act=(o)=>send({type:"action",targetSeat:Z,bySeat:Z,toolAction:o});
+  q("[data-zjadd]").forEach(b=>b.onclick=()=>act({type:"yzAdd",rank:+b.dataset.zjadd}));
+  q("[data-zjundo]").forEach(b=>b.onclick=()=>act({type:"yzUndo"}));
+  q("[data-zjset]").forEach(b=>b.onclick=()=>{const v=prompt("把「黄」校正为:",String((zj.toolState||{}).huang||0));if(v==null)return;const n=+v;if(!Number.isInteger(n)||n<0)return toast("请输入非负整数");act({type:"yzSet",n});});
+  q("[data-zjclear]").forEach(b=>b.onclick=()=>{if(confirm("发动肆军,弃置所有「黄」(计数清零)?"))act({type:"sjClear"});});
+}
+
+/* ---------- 谢灵毓:元嫡 牌名组台账(全公开)。勾本回合已进入弃牌堆的牌名,全勾即摸;可移除牌名,技能描述随之改写 ---------- */
+const XLY_ALL=["杀","闪","桃"];
+function xlySkillText(names){ return `锁定技，当每回合首次有${names.map(n=>"【"+n+"】").join("")}为一组的牌名均进入过弃牌堆后，你摸一张牌。${names.length>1?"若其中有牌不因使用进入弃牌堆，且剩余牌名大于一，你移除一个牌名。":"(牌名组只剩一个,不能再移除)"}`; }
+function viewXlyTool(x){
+  const ts=x.toolState||{}, iAm=state.youHold.includes(x.seatNo);
+  const names=ts.names||XLY_ALL, seen=ts.seen||[], removed=ts.removed||[], all=names.every(n=>seen.includes(n));
+  let h=`<div class="card"><h2>谢灵毓 · 元嫡<span class="tag">牌名组 ${names.length}/3 · 全公开</span></h2>`;
+  h+=`<div style="border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:rgba(255,252,244,.6)"><div style="font-weight:700;margin-bottom:3px">元嫡 <span class="stag stag-lock">锁定技</span>${removed.length?`<span class="hint" style="margin:0 0 0 6px">已移除:${removed.map(n=>"【"+n+"】").join("")}</span>`:""}</div><div style="font-size:13px">${esc(xlySkillText(names))}</div></div>`;
+  h+=`<div class="hint" style="margin:8px 0 4px">本回合已进入弃牌堆的牌名(勾完一组就摸一张):</div><div class="row" style="gap:6px">`
+    +names.map(n=>`<button class="pick ${seen.includes(n)?"sel":""}" data-xlymark="${n}" style="padding:8px 14px;font-weight:700"${iAm?"":" disabled"}>${n}${seen.includes(n)?" ✓":""}</button>`).join("")+`</div>`;
+  if(all) h+=`<div style="margin-top:6px;font-weight:700;color:var(--seal)">✦ ${names.map(n=>"【"+n+"】").join("")}均已进入弃牌堆 → 摸一张牌${ts.drawn?"":""}</div>`;
+  if(iAm){
+    h+=`<div class="row" style="margin-top:10px;gap:6px"><button class="ghost" data-xlyturn="1" style="font-size:12px">新回合(清空勾选)</button><span class="grow"></span>`
+      +(names.length>1?`<button data-xlyrm="1" style="font-size:12px;border-color:var(--seal);color:var(--seal)">移除一个牌名…</button>`:"")+`</div>`;
+    if(removed.length) h+=`<div class="row" style="margin-top:6px;gap:6px"><span class="hint" style="margin:0">纠错放回:</span>`+removed.map(n=>`<button class="ghost" data-xlyback="${n}" style="font-size:12px">【${n}】</button>`).join("")+`</div>`;
+    h+=`<div class="hint" style="margin-top:8px">移除条件:本组里有牌<b>不是因使用</b>进入弃牌堆(被弃置/被拆等)且组内剩余牌名多于一个,自己判定后点「移除」。</div>`;
+  }else h+=`<div class="hint">谢灵毓本人操作,你只读。</div>`;
+  h+=`</div>`;
+  if(ts.log&&ts.log.length) h+=`<div class="card"><h2>记录</h2><div class="loglist">`+ts.log.slice(0,20).map(l=>`<div>${esc(l)}</div>`).join("")+`</div></div>`;
+  return h;
+}
+function bindXly(x,q){
+  const X=x.seatNo, act=(o)=>send({type:"action",targetSeat:X,bySeat:X,toolAction:o});
+  q("[data-xlymark]").forEach(b=>b.onclick=()=>act({type:"ydMark",name:b.dataset.xlymark}));
+  q("[data-xlyturn]").forEach(b=>b.onclick=()=>act({type:"newTurn"}));
+  q("[data-xlyback]").forEach(b=>b.onclick=()=>{if(confirm("把【"+b.dataset.xlyback+"】放回牌名组?(纠错)"))act({type:"ydRestore",name:b.dataset.xlyback});});
+  q("[data-xlyrm]").forEach(b=>b.onclick=()=>{
+    const names=((x.toolState||{}).names)||XLY_ALL;
+    const v=prompt("移除哪个牌名?输入:"+names.join(" / "),names[names.length-1]);
+    if(v==null)return; const n=v.trim(); if(!names.includes(n))return toast("牌名不在当前组里");
+    if(confirm("移除【"+n+"】?之后元嫡只看"+names.filter(y=>y!==n).map(y=>"【"+y+"】").join("")+"。"))act({type:"ydRemove",name:n});
+  });
+}
+
 const LYS_TRICKS=["无中生有","过河拆桥","顺手牵羊","决斗","借刀杀人","火攻","知己知彼","远交近攻","调虎离山"];
 let lysPick={}; // 本机暂存:{花色:待记录的牌名}
 function viewLysTool(lys){

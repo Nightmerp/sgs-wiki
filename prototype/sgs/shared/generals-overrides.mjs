@@ -266,7 +266,7 @@ export const OFFLINE_HEROES = [
     characteristic: "基本牌进入弃牌堆获取收益，可以创造大量过牌。",
     cover: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/big/static/76900.png",
     avatar: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/skinShop/76900.png",
-    tool: null, offline: true,
+    tool: "xielingyu", offline: true, // 元嫡牌名组台账(2026-10-10)
   },
   {
     id: 9024, name: "逢纪", genre: "璀璨星河", series: "标", faction: "群",

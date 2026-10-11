@@ -105,6 +105,9 @@ export function handleSgs(request, env, url) {
   // 将池(白名单):全局一份,存在 SgsConfigDO(单例 "global");/pool 编辑页读写,发将时房间也读它。无鉴权(朋友局,用户定)
   if (url.pathname === "/api/pool" && (request.method === "GET" || request.method === "PUT"))
     return env.SGS_CONFIG.get(env.SGS_CONFIG.idFromName("global")).fetch(request);
+  // 历史对局(只读;写入只走房间 DO 内部调用,外面不开 POST)
+  if (url.pathname === "/api/history" && request.method === "GET")
+    return env.SGS_CONFIG.get(env.SGS_CONFIG.idFromName("global")).fetch(request);
 
   if (request.method === "GET") {
     // 只读参考数据(同源、可缓存):武将库 / 衍生技 / 衍生牌 / 装备 / 禁将池
@@ -148,7 +151,26 @@ export class SgsConfigDO {
     }
     return { pools, seen: (raw && raw.seen) || [], updatedAt: (raw && raw.updatedAt) || null };
   }
+  // 历史对局:storage key "history" = [记录…](新的在前)。保留策略 HISTORY_KEEP 条 / HISTORY_DAYS 天,写入时修剪;同 id 覆盖(一局多次更新)
+  static HISTORY_KEEP = 300; static HISTORY_DAYS = 180;
+  async history(request) {
+    const noStore = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
+    let list = (await this.state.storage.get("history")) || [];
+    if (request.method === "POST") {
+      let rec; try { rec = await request.json(); } catch { return new Response("bad", { status: 400 }); }
+      if (!rec || typeof rec.id !== "string" || !Array.isArray(rec.seats)) return new Response("bad", { status: 400 });
+      rec = { id: rec.id.slice(0, 32), t0: Number(rec.t0) || Date.now(), t: Date.now(), room: String(rec.room || "").slice(0, 8), mode: rec.mode ? String(rec.mode).slice(0, 12) : null,
+        seats: rec.seats.slice(0, 10).map((s) => ({ n: Number(s.n) || 0, player: s.player ? String(s.player).slice(0, 12) : null, general: s.general ? String(s.general).slice(0, 12) : null, role: s.role ? String(s.role).slice(0, 6) : null })) };
+      list = list.filter((x) => x.id !== rec.id); list.unshift(rec);
+      const cutoff = Date.now() - SgsConfigDO.HISTORY_DAYS * 86400000;
+      list = list.filter((x) => (x.t || x.t0) >= cutoff).slice(0, SgsConfigDO.HISTORY_KEEP);
+      await this.state.storage.put("history", list);
+      return new Response(JSON.stringify({ ok: true, n: list.length }), { headers: noStore });
+    }
+    return new Response(JSON.stringify({ list, keep: SgsConfigDO.HISTORY_KEEP, days: SgsConfigDO.HISTORY_DAYS }), { headers: noStore });
+  }
   async fetch(request) {
+    if (new URL(request.url).pathname === "/api/history") return this.history(request);
     const noStore = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
     const norm = (a) => [...new Set((Array.isArray(a) ? a : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 5000);
     if (request.method === "PUT") {
@@ -191,7 +213,17 @@ export class RoomDO extends RoomDOBase {
     } catch { /* 读不到就沿用上次/文件默认 */ }
     return this._cfg;
   }
-  async onMessage(ws, data) { await this.ensureCore(); await this.syncConfig(); return super.onMessage(ws, data); }
+  async onMessage(ws, data) { await this.ensureCore(); await this.syncConfig(); const r = await super.onMessage(ws, data); await this.recordGame(); return r; }
+  // 历史对局:每次变更后把本局快照 upsert 到 SgsConfigDO(内容没变不发;DO 休眠醒来后 _gameSig 丢失会多发一次,upsert 幂等)
+  async recordGame() {
+    if (!this.core) return;
+    let rec; try { rec = this.core.gameRecord(); } catch { return; }
+    if (!rec) return;
+    const sig = JSON.stringify([rec.id, rec.mode, rec.seats]);
+    if (sig === this._gameSig) return;
+    this._gameSig = sig;
+    try { await this.env.SGS_CONFIG.get(this.env.SGS_CONFIG.idFromName("global")).fetch("https://config/api/history", { method: "POST", body: JSON.stringify(rec) }); } catch { /* 记不上就算了,不影响对局 */ }
+  }
   createCore() { return new RoomCore("room", SEAT_COUNT); }
   hydrateCore(saved) { return RoomCore.hydrate(saved); }
   onGameMessage(ws, msg, core) {

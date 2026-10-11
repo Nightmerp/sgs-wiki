@@ -130,6 +130,8 @@ export const TOOL_NAMES = {
   "族王明山": "wangmingshan", // OL 已收录(id608);剩墨台账,同上防重爬丢失
   "贾充": "jiachong", // OL 已收录(id7019);凶竖秘密猜测,同上防重爬丢失
   "族陆郁生": "zuluyusheng", // OL 已收录(id751);拾昔花色台账,同上防重爬丢失
+  "神张角": "shenzhangjiao", // OL 已收录(id227);异兆「黄」计数器,tool 直写 generals.json,此处防重爬丢失
+  "谢灵毓": "xielingyu",     // 手录 9023(olwiki 769,官网未收录);元嫡牌名组台账。graduate 时靠这里接管 tool
   "谋程昱": "mouchengyu", // OL 已收录(id734);胆持跨座位秘密选类型,同上防重爬丢失
 };
 

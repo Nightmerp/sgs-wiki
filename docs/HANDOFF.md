@@ -1,6 +1,6 @@
 # SGS-Wiki 线下房间 · 交接文档
 
-> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **713 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
+> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **747 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
 
 ## ⭐⭐ 2026-09-24:多游戏架构 + 风声(游卡典藏版)房间 v1 —— 新会话先读这段,再读下面三国杀状态
 
@@ -24,11 +24,11 @@
 
 ## ⭐ 最新状态(2026-09-22,graduate + 3 新将 + 谋程昱工具 + 神典韦池扩到 33,全部 push 到 main)—— 新会话先读这段
 
-**基线**:`node prototype/sgs/room-sim.mjs` → **713 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
+**基线**:`node prototype/sgs/room-sim.mjs` → **747 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
 
 **规模**:武将库 **709 将**(692 OL = 官网花名册全量 + 17 手录/线下,含《不臣之君》3 模式将)· 房间工具 **24 个** · 装备库 **58 张** · 选将支持拼音。
 
-**24 个工具**:魔吕布 / 南华老仙 / 族荀攸 / 谋黄月英 / 魔曹操 / 袁姬 / 钟琰 / 魔司马懿 / 谋董昭 / 神孙权 / 魔貂蝉 / 魔孙权 / 神典韦 / 李傕 / 徐荣 / SP徐氏 / 郭照 / 裴秀 / 蒲元 / 曹婴(伏间随机目标) / 族王明山(剩墨台账+弹雀点数) / 贾充(凶竖秘密猜测,保密) / 族陆郁生(拾昔四花色台账) / 谋程昱(胆持跨座位秘密选类型,保密)。
+**26 个工具**:魔吕布 / 南华老仙 / 族荀攸 / 谋黄月英 / 魔曹操 / 袁姬 / 钟琰 / 魔司马懿 / 谋董昭 / 神孙权 / 魔貂蝉 / 魔孙权 / 神典韦 / 李傕 / 徐荣 / SP徐氏 / 郭照 / 裴秀 / 蒲元 / 曹婴(伏间随机目标) / 族王明山(剩墨台账+弹雀点数) / 贾充(凶竖秘密猜测,保密) / 族陆郁生(拾昔四花色台账) / 谋程昱(胆持跨座位秘密选类型,保密)/ 神张角(异兆「黄」计数)/ 谢灵毓(元嫡牌名组台账,技能描述随之改写)。
 
 **房间级功能(已上线代码)**:
 - 全场状态面板:血量/翻面/连环/阵亡(横置已并入连环);残血起手将按 initialHp 播种
@@ -84,7 +84,7 @@
 
 ## ✅ 身份自动发放 + 发将武将锁定 + 新一局(2026-10-01,待 deploy)
 
-**基线**:room-sim **713**。
+**基线**:room-sim **747**。
 
 **发将亮出的武将锁定**:`seat.genLocked`(dealPick 君主 / dealReveal 落座时置 true)→ `setGeneral` 拒 `GENERAL_LOCKED`,座位卡不再给「选武将 ▾」。手动选将的座位不锁、下拉照旧。解锁 = 重新发将(参与座位)/ 发身份时清空武将 / 房间设置「🔄 新一局」(`newGame`:清全场武将+身份+进行中的发将,座位与持有者不动)。
 
@@ -115,7 +115,13 @@
 
 **⚠ Cloudflare 免费额度告警(2026-10-06)→ DO WebSocket 改休眠模式(`common/room-do.mjs`,待 deploy)**:邮件「Durable Objects daily operation limit 90%」超的是 **duration(GB·s)** 不是请求数。原因:原先 `ws.accept()+addEventListener` 是非休眠 WebSocket,只要有一个连接挂着(手机后台留着页面、客户端自动重连)DO 就常驻内存按时长计费;免费额度 13,000 GB·s/天 ≈ 一个 128MB DO 活 29 小时,几间房各挂一台手机就超。现改为 **Hibernation API**:`state.acceptWebSocket(ws)` + `webSocketMessage/webSocketClose/webSocketError` 回调;连接↔deviceId 存 `ws.serializeAttachment({d})`(不能存 this 上,休眠会丢);`sockets()=state.getWebSockets()`;`this.core` 休眠后为 null 由 ensureCore 回灌;没人在线时 onClose 不回灌 core(让 DO 尽快空闲)。三国杀/风声共用同一基类,行为不变(本地双标签验过 认领/改名/广播/断线重连/解散/风声)。⚠ 本地 wrangler dev 里客户端直接关页面会打一行 `Uncaught Error: Network connection lost`——是运行时对异常断开的日志,无害。**deploy 后用量看**:dash.cloudflare.com → Workers & Pages → Durable Objects → 看 Duration 曲线应明显掉下来;若还高,再查 alarm/其它。
 
-**⭐ 新录武将 checklist(2026-10-05 固化;用户要求每次都过一遍——一个武将不只在 generals.json,配套数据散在 6 处)**。跑 `node prototype/sgs/check-hero-data.mjs [--ids 9026,…]` 自动体检(rebake/scrape 跑完也会提醒):
+**⭐ 2026-10-10 小伙伴四需求(全部做完,待 deploy;room-sim **747**,现 **26 工具**)**:
+- **神张角「异兆」计数器**(tool `shenzhangjiao`,227 直写 generals.json + TOOL_NAMES;全公开生成器范式,worker 零改):toolState `{huang,lastDraw,hist,log}`;`yzAdd{rank 1..13}` 加「黄」并判十位数是否改变(改变=摸一张,`lastDraw`)/ `yzUndo` 撤销上一张 / `yzSet{n}` 手动校正 / `sjClear` 肆军弃置所有黄 / `resetGame`。UI 13 个点数键 + 大字计数 + 「再加 N 点就进位」。
+- **谢灵毓「元嫡」牌名组台账**(tool `xielingyu`,9023 的 tool 写在 OFFLINE_HEROES 条目里 + TOOL_NAMES 防 graduate 丢):`{names:["杀","闪","桃"],seen,removed,drawn,log}`;`ydMark{name}` 勾/取消本回合已进弃牌堆,全勾 → drawn(摸一张提示)/ `ydRemove{name}` 移除牌名(组须剩 >1)/ `ydRestore{name}` 纠错放回(按 杀闪桃 原序)/ `newTurn` 清勾选 / `resetGame`。**技能描述按当前 names 在客户端生成**(`xlySkillText`),移除后即时改写。
+- **选将弹层里看君主已选的武将**:`renderDeal` 顶部「已亮出」块列出 firstSeats(君主/明忠/两主帅)已亮出的武将 + 「技能」展开(展开 key 用负座位号 `dealOpen=-seatNo`,避免与候选同武将撞车)。
+- **历史对局**(用户问"好储存么/TTL 怎么设"):存 **SgsConfigDO**(全局单例、不随房间 2h TTL 消失)key `history`,每条 `{id,t0,t,room,mode,seats:[{n,player,general,role}]}`,只记谁选了什么武将(+全部亮明后的身份),不记牌。**保留策略 = 300 条 / 180 天**(`SgsConfigDO.HISTORY_KEEP/HISTORY_DAYS`,写入时修剪);一条 ≈ 300B,300 条 <100KB。**局 id**:`RoomCore.game={id,t0}`,`newGame`/`identStart(清武将)`/`dealStart`(已有人落座时)换新;手动选将首次落座自动开局;`gameRecord()` 出快照。`RoomDO.onMessage` 每次变更后 `recordGame()`:签名没变不发,变了 POST 到 config DO `/api/history`(内部 stub 调用;对外只开 GET)。客户端 房间设置 →「📜 历史对局」弹层(本房标「本房」)。
+
+(2026-10-05 固化;用户要求每次都过一遍——一个武将不只在 generals.json,配套数据散在 6 处)**。跑 `node prototype/sgs/check-hero-data.mjs [--ids 9026,…]` 自动体检(rebake/scrape 跑完也会提醒):
 1. **武将本体** `shared/generals.json`:官网有 → `scrape-generals.mjs --ids`;官网没有 → `generals-overrides.mjs` OFFLINE_HEROES(9000+)+ `rebake-overrides.mjs`。有工具的还要 `scrape-generals.mjs` TOOL_NAMES。
 2. **拼音** `shared/hero-pinyin.json`:`node prototype/sgs/build-pinyin.mjs`(多音姓氏往 `FIX` 表加)。不跑=只能中文搜到。
 3. **扩展包** `shared/hero-packs.json` `packs[id]`:包名照 olwiki 将灯(如 `璀璨星河-天极`)。不加=图鉴/将池页落到 genre 组。

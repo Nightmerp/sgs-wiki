@@ -384,6 +384,10 @@ export function initToolState(generalId) {
     return { pending: null, choice: {}, settle: null, log: [] }; // 胆持:pending={targetSeat,sourceSeat|null,revealed};choice={}|{c}(保密,见 VISIBILITY);settle={actual,diff}(公开)
   if (generalId === "jiachong")
     return { round: 1, usedThisRound: 0, pending: null, guess: {}, lastReveal: null, log: [] }; // 凶竖:pending={targetSeat,cardName,cost};guess={}|{g}(保密);lastReveal=揭晓结果(公开)
+  if (generalId === "shenzhangjiao")
+    return { huang: 0, lastDraw: null, hist: [], log: [] }; // 异兆计数:huang=「黄」标记数;lastDraw=最近一次是否摸牌;hist=[{rank,prev}] 供撤销
+  if (generalId === "xielingyu")
+    return { names: ["杀", "闪", "桃"], seen: [], removed: [], drawn: false, log: [] }; // 元嫡:names=当前牌名组;seen=本回合已进入弃牌堆的牌名;removed=已移除;drawn=本回合已触发摸牌
   if (generalId === "wangmingshan")
     return { round: 1, usedRanks: [], usedBasics: [], lastRank: null, lastDiff: null, log: [] }; // 剩墨台账:usedRanks=已选过的点数(A~K)、usedBasics=已用过的基本牌;弹雀:lastRank=上一张使用牌的点数(跨回合保留,剩墨印牌无点数需清空)、lastDiff=最近一次算出的 X
   if (generalId === "xurong")
@@ -440,6 +444,7 @@ export class RoomCore extends RoomBase {
     this.banEnabled = true; // ② 禁将总开关(房内共享,任何玩家可切;默认开)
     this.deal = null;       // 线上发将进行中的状态(null=没在发);见 dealStart
     this.ident = null;      // 本局身份(null=没发过);见 identStart
+    this.game = null;       // 本局标识 {id,t0}:历史对局记录按它 upsert(见 gameRecord);新一局/发身份/发将 换新 id,手动选将时首次落座自动开
   }
 
   // 新座位模板。全场状态面板字段(全公开,任意设备可改):血量/翻面/连环/阵亡;hp/hpMax=null 表示未播种(登记武将后由客户端按体力上限播种)。连环=铁索连环,物理表现即横置,合二为一只保留 chained
@@ -468,7 +473,20 @@ export class RoomCore extends RoomBase {
     return { ok: true };
   }
   // 落座的实际动作(setGeneral 校验通过后 / 线上发将亮出时调用;不做持有者与禁将校验)
+  _newGame() { this.game = { id: Date.now().toString(36) + Math.floor(this.rng() * 1e6).toString(36), t0: Date.now() }; }
+  // 历史对局记录(存 SgsConfigDO,由 RoomDO 在每次变更后 upsert):只记 时间/房间/模式/每座位 玩家名+武将(+全部亮明后的身份)。没人选将 → null
+  gameRecord() {
+    const seats = this.seatNos().map((n) => this.seats[n]).filter((s) => s.general || s.holderDevices.length);
+    if (!seats.some((s) => s.general)) return null;
+    if (!this.game) this._newGame();
+    const over = this.ident && this.ident.over;
+    return { id: this.game.id, t0: this.game.t0, t: Date.now(), room: this.roomCode,
+      mode: this.ident ? (IDENT_MODES[this.ident.mode]?.label || this.ident.mode) : null,
+      seats: seats.map((s) => ({ n: s.seatNo, player: s.holderDevices[0] || null, general: s.general ? (heroInfo(s.general)?.name || s.general) : null,
+        role: over && this.ident.roles[s.seatNo] ? (this.ident.roles[s.seatNo].title || this.ident.roles[s.seatNo].role) : null })) };
+  }
   _applyGeneral(n, g, locked = false) {
+    if (g && !this.game) this._newGame(); // 手动选将开局:首次有人落座即算一局开始
     this.seats[n].general = g; this.seats[n].toolState = g ? initToolState(g) : {};
     this.seats[n].genLocked = !!locked;
     this.seats[n].skin = null;          // 改武将→皮肤回默认立绘
@@ -536,6 +554,7 @@ export class RoomCore extends RoomBase {
       }
     }
     if (!firstSeats) firstSeats = lordSeat != null ? [lordSeat] : [];
+    if (!this.ident || this.seatNos().some((n) => this.seats[n].general)) this._newGame(); // 发将=新一局(刚发完身份的那局除外,沿用同一条记录)
     // lordSeat=拿主公技候选的君主座位(明忠模式=明忠座位,无额外候选);firstSeats=先选先亮的座位(君主 / 明忠 / 无间道两主帅),lordTitle=其称谓
     this.deal = { mode, lordSeat, firstSeats, lordTitle, lordPicked: false, hands, pool: normal, poolKey, poolLabel }; // poolKey/Label:用的是哪个环境的名单(仅展示)
     return { ok: true, players: players.length };
@@ -643,7 +662,7 @@ export class RoomCore extends RoomBase {
     const map = this._reseat([...players.slice(k), ...players.slice(0, k), ...all.filter((n) => !players.includes(n))]);
     const moved = {};
     for (const [n, r] of Object.entries(roles)) moved[map[n]] = r;
-    if (clearGenerals) for (const n of this.seatNos()) this._applyGeneral(n, null);
+    if (clearGenerals) { for (const n of this.seatNos()) this._applyGeneral(n, null); this._newGame(); } // 发身份=新一局
     this.ident = { id: 1 + Math.floor(this.rng() * 1e9), mode, counts: chk.counts, lost: chk.lost, over: false, roles: moved };
     return { ok: true, players: players.length, leadWas: leadSeat };
   }
@@ -718,7 +737,7 @@ export class RoomCore extends RoomBase {
   newGame(id) {
     if (!this.devices[id]) return { error: "NO_DEVICE" };
     for (const n of this.seatNos()) this._applyGeneral(n, null);
-    this.deal = null; this.ident = null;
+    this.deal = null; this.ident = null; this._newGame();
     return { ok: true };
   }
   // 该设备看到的身份视图:pub=全场可见的身份(未亮明为 null;失心未亮明为「失心」);mine=仅持有者可见(真身/已知信息/胜利条件)
@@ -990,6 +1009,86 @@ export class RoomCore extends RoomBase {
         return { ok: true };
       }
       if (t === "resetGame") { if (!isLys) return { error: "NOT_LYS_ACTION" }; target.toolState = initToolState(target.general); return { ok: true, reset: true }; }
+      return { error: "UNKNOWN_ACTION" };
+    }
+
+    // ───────── 神张角:异兆「黄」计数器(全公开)。使用/打出牌结算后获得等同点数的「黄」;十位数因此改变 → 摸一张。
+    // 肆军(准备阶段「黄」>牌堆数时弃置所有「黄」)只提供「弃置所有黄」清零;牌堆数线下自己数 ─────────
+    if (target.general === "shenzhangjiao") {
+      const zSeat = targetSeat;
+      const isZj = bySeat === zSeat && iHold(zSeat);
+      if (!ts.hist) ts.hist = [];
+      const RK = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+      if (t === "yzAdd") { // {rank:1..13}
+        if (!isZj) return { error: "NOT_ZJ_ACTION" };
+        const r = Number(toolAction.rank);
+        if (!Number.isInteger(r) || r < 1 || r > 13) return { error: "BAD_RANK" };
+        const prev = ts.huang || 0, next = prev + r;
+        const draw = Math.floor(prev / 10) !== Math.floor(next / 10);
+        ts.huang = next; ts.lastDraw = draw;
+        ts.hist.push({ rank: r, prev }); if (ts.hist.length > 100) ts.hist.shift();
+        this._log(ts, `+${r}(${RK[r]}):黄 ${prev} → ${next}${draw ? " · 十位数变了,摸一张" : ""}`);
+        return { ok: true, huang: next, draw };
+      }
+      if (t === "yzUndo") { // 撤销最近一次
+        if (!isZj) return { error: "NOT_ZJ_ACTION" };
+        const last = ts.hist.pop(); if (!last) return { error: "NOTHING_TO_UNDO" };
+        ts.huang = last.prev; ts.lastDraw = null;
+        this._log(ts, `撤销 +${last.rank}:黄 → ${last.prev}`);
+        return { ok: true };
+      }
+      if (t === "yzSet") { // 手动校正 {n}
+        if (!isZj) return { error: "NOT_ZJ_ACTION" };
+        const n = Number(toolAction.n);
+        if (!Number.isInteger(n) || n < 0 || n > 999) return { error: "BAD_COUNT" };
+        this._log(ts, `手动校正:黄 ${ts.huang || 0} → ${n}`);
+        ts.huang = n; ts.lastDraw = null; ts.hist = [];
+        return { ok: true };
+      }
+      if (t === "sjClear") { // 肆军:弃置所有「黄」
+        if (!isZj) return { error: "NOT_ZJ_ACTION" };
+        this._log(ts, `肆军:弃置所有黄(原 ${ts.huang || 0})`);
+        ts.huang = 0; ts.lastDraw = null; ts.hist = [];
+        return { ok: true };
+      }
+      if (t === "resetGame") { if (!isZj) return { error: "NOT_ZJ_ACTION" }; target.toolState = initToolState(target.general); return { ok: true, reset: true }; }
+      return { error: "UNKNOWN_ACTION" };
+    }
+
+    // ───────── 谢灵毓:元嫡 牌名组台账(全公开)。每回合勾「已进入弃牌堆」的牌名,组内全勾 → 摸一张;
+    // 之后若满足条件可移除一个牌名(组剩 >1 时),技能描述随之改写(客户端按 names 生成) ─────────
+    if (target.general === "xielingyu") {
+      const xSeat = targetSeat;
+      const isXly = bySeat === xSeat && iHold(xSeat);
+      if (!ts.names) ts.names = ["杀", "闪", "桃"];
+      if (!ts.seen) ts.seen = []; if (!ts.removed) ts.removed = [];
+      const nm = String(toolAction.name || "");
+      if (t === "ydMark") { // 勾/取消 本回合该牌名已进入弃牌堆
+        if (!isXly) return { error: "NOT_XLY_ACTION" };
+        if (!ts.names.includes(nm)) return { error: "BAD_NAME" };
+        if (ts.seen.includes(nm)) ts.seen = ts.seen.filter((x) => x !== nm);
+        else ts.seen.push(nm);
+        const all = ts.names.every((x) => ts.seen.includes(x));
+        if (all && !ts.drawn) { ts.drawn = true; this._log(ts, `本回合【${ts.names.join("】【")}】均已进入弃牌堆 → 摸一张`); }
+        return { ok: true, all };
+      }
+      if (t === "ydRemove") { // 移除一个牌名(组内须剩 >1)
+        if (!isXly) return { error: "NOT_XLY_ACTION" };
+        if (!ts.names.includes(nm)) return { error: "BAD_NAME" };
+        if (ts.names.length <= 1) return { error: "LAST_NAME" };
+        ts.names = ts.names.filter((x) => x !== nm); ts.seen = ts.seen.filter((x) => x !== nm); ts.removed.push(nm);
+        this._log(ts, `元嫡:移除牌名【${nm}】,现为【${ts.names.join("】【")}】`);
+        return { ok: true };
+      }
+      if (t === "ydRestore") { // 纠错:放回一个已移除的牌名
+        if (!isXly) return { error: "NOT_XLY_ACTION" };
+        if (!ts.removed.includes(nm)) return { error: "BAD_NAME" };
+        ts.removed = ts.removed.filter((x) => x !== nm); ts.names = ["杀", "闪", "桃"].filter((x) => ts.names.includes(x) || x === nm);
+        this._log(ts, `放回牌名【${nm}】(纠错),现为【${ts.names.join("】【")}】`);
+        return { ok: true };
+      }
+      if (t === "newTurn") { if (!isXly) return { error: "NOT_XLY_ACTION" }; ts.seen = []; ts.drawn = false; this._log(ts, "新回合:清空本回合勾选"); return { ok: true }; }
+      if (t === "resetGame") { if (!isXly) return { error: "NOT_XLY_ACTION" }; target.toolState = initToolState(target.general); return { ok: true, reset: true }; }
       return { error: "UNKNOWN_ACTION" };
     }
 
@@ -2334,7 +2433,7 @@ export class RoomCore extends RoomBase {
   // cfgRev:服务端名单(/pool)版本号,由 RoomDO.syncConfig 设置;客户端见它变了就重拉禁将面板数据(不持久化)
   _roomView(holds) { return { banEnabled: this.banEnabled !== false, banPool: banPoolForSeats(Object.keys(this.seats).length), deal: this._dealView(holds), ident: this._identView(holds), cfgRev: this.cfgRev || 0 }; }
   // ---- 持久化:通用部分见 RoomBase.serialize/hydrate ----
-  _serializeExtra() { return { banEnabled: this.banEnabled, deal: this.deal, ident: this.ident }; }
-  _hydrateExtra(data) { this.banEnabled = data.banEnabled !== false; this.deal = data.deal || null; this.ident = data.ident || null; } // 老房间无此字段→默认开/无发将
+  _serializeExtra() { return { banEnabled: this.banEnabled, deal: this.deal, ident: this.ident, game: this.game }; }
+  _hydrateExtra(data) { this.banEnabled = data.banEnabled !== false; this.deal = data.deal || null; this.ident = data.ident || null; this.game = data.game || null; } // 老房间无此字段→默认开/无发将
 }
 

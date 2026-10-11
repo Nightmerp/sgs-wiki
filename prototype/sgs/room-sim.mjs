@@ -874,6 +874,83 @@ check("清除后可重录(纠错)", lysAct(1, { type: "sxClear", suit: "S" }).ok
 check("序列化/hydrate 存活", (() => { const h = RoomCore.hydrate(roomL2.serialize()); const r = h.seats[1].toolState.records; return r.S === "顺手牵羊" && r.H === "无中生有" && r.C === "调虎离山" && r.D === null; })());
 check("重开清空四花色", lysAct(1, { type: "resetGame" }).reset === true && ["S", "H", "C", "D"].every((k) => LYT().records[k] === null));
 
+// ============ 场景 15f:神张角 异兆「黄」计数器 ============
+console.log("\n=== 场景 15f:神张角 异兆 ===");
+{
+  const rm = new RoomCore("3581", 3, () => 0);
+  const d = {}; for (let i = 1; i <= 3; i++) { d[i] = `zj${i}`; rm.claimSeat(d[i], i); }
+  rm.setGeneral(d[1], 1, "shenzhangjiao");
+  const act = (by, o) => rm.action(d[by], { targetSeat: 1, bySeat: by, toolAction: o });
+  const T = () => rm.seats[1].toolState;
+  check("init:黄=0", T().huang === 0 && T().hist.length === 0);
+  check("非本人不能加", act(2, { type: "yzAdd", rank: 5 }).error === "NOT_ZJ_ACTION");
+  check("点数越界被拒", act(1, { type: "yzAdd", rank: 14 }).error === "BAD_RANK" && act(1, { type: "yzAdd", rank: 0 }).error === "BAD_RANK");
+  check("+7:黄 0→7,十位没变不摸", act(1, { type: "yzAdd", rank: 7 }).draw === false && T().huang === 7 && T().lastDraw === false);
+  check("⭐ +5:黄 7→12,十位 0→1 摸一张", act(1, { type: "yzAdd", rank: 5 }).draw === true && T().huang === 12 && T().lastDraw === true);
+  check("+13(K):12→25 十位 1→2 摸", act(1, { type: "yzAdd", rank: 13 }).draw === true && T().huang === 25);
+  check("+3:25→28 不摸", act(1, { type: "yzAdd", rank: 3 }).draw === false);
+  check("撤销:28→25", act(1, { type: "yzUndo" }).ok && T().huang === 25 && T().hist.length === 3);
+  check("全场公开", rm.viewFor(d[2]).seats[1].toolState.huang === 25);
+  check("手动校正", act(1, { type: "yzSet", n: 40 }).ok && T().huang === 40 && T().hist.length === 0 && act(1, { type: "yzUndo" }).error === "NOTHING_TO_UNDO");
+  check("肆军弃置所有黄 → 0", act(1, { type: "sjClear" }).ok && T().huang === 0);
+  check("序列化存活", RoomCore.hydrate(rm.serialize()).seats[1].toolState.log.length === T().log.length);
+}
+// ============ 场景 15g:谢灵毓 元嫡 牌名组 ============
+console.log("\n=== 场景 15g:谢灵毓 元嫡 ===");
+{
+  const rm = new RoomCore("3582", 3, () => 0);
+  const d = {}; for (let i = 1; i <= 3; i++) { d[i] = `xl${i}`; rm.claimSeat(d[i], i); }
+  rm.setGeneral(d[1], 1, "xielingyu");
+  const act = (by, o) => rm.action(d[by], { targetSeat: 1, bySeat: by, toolAction: o });
+  const T = () => rm.seats[1].toolState;
+  check("init:杀闪桃", T().names.join() === "杀,闪,桃" && T().seen.length === 0);
+  check("非本人不能勾", act(2, { type: "ydMark", name: "杀" }).error === "NOT_XLY_ACTION");
+  check("不在组里的牌名被拒", act(1, { type: "ydMark", name: "酒" }).error === "BAD_NAME");
+  check("勾杀、闪:未齐", act(1, { type: "ydMark", name: "杀" }).all === false && act(1, { type: "ydMark", name: "闪" }).all === false && !T().drawn);
+  check("⭐ 勾桃:三名齐 → 摸一张(drawn)", act(1, { type: "ydMark", name: "桃" }).all === true && T().drawn === true);
+  check("再点一次=取消勾选,drawn 保持(本回合已摸过)", act(1, { type: "ydMark", name: "桃" }).all === false && T().seen.join() === "杀,闪" && T().drawn === true);
+  check("移除桃:组变 杀闪", act(1, { type: "ydRemove", name: "桃" }).ok && T().names.join() === "杀,闪" && T().removed.join() === "桃");
+  check("新回合清勾选", act(1, { type: "newTurn" }).ok && T().seen.length === 0 && T().drawn === false);
+  check("组只剩两名时勾齐即摸", act(1, { type: "ydMark", name: "杀" }).all === false && act(1, { type: "ydMark", name: "闪" }).all === true);
+  check("移除到只剩 1 个后不能再移", act(1, { type: "ydRemove", name: "闪" }).ok && T().names.join() === "杀" && act(1, { type: "ydRemove", name: "杀" }).error === "LAST_NAME");
+  check("纠错放回:按 杀闪桃 原序", act(1, { type: "ydRestore", name: "桃" }).ok && T().names.join() === "杀,桃" && act(1, { type: "ydRestore", name: "闪" }).ok && T().names.join() === "杀,闪,桃" && T().removed.length === 0);
+  check("全场公开 + 序列化存活", rm.viewFor(d[3]).seats[1].toolState.names.length === 3 && RoomCore.hydrate(rm.serialize()).seats[1].toolState.names.join() === "杀,闪,桃");
+  check("重开", act(1, { type: "resetGame" }).reset === true && T().seen.length === 0);
+}
+
+// ============ 场景 15h:历史对局记录(gameRecord / 局 id 何时换)============
+console.log("\n=== 场景 15h:历史对局记录 ===");
+{
+  let x = 7; const rng = () => (x = (x * 1103515245 + 12345) % 2147483648) / 2147483648;
+  const rm = new RoomCore("5566", 4, rng);
+  for (let i = 1; i <= 4; i++) rm.claimSeat("h" + i, i);
+  check("没人选将 → 不记录,也不开局", rm.gameRecord() === null && rm.game === null);
+  rm.setGeneral("h1", 1, "lvbu");
+  const r1 = rm.gameRecord();
+  check("⭐ 手动选将首次落座即开局:记录含 房间/座位/玩家/武将", r1 && rm.game && r1.id === rm.game.id && r1.room === "5566" && r1.mode === null
+    && r1.seats.length === 4 && r1.seats[0].player === "h1" && r1.seats[0].general === "lvbu" && r1.seats[1].general === null && r1.seats[0].role === null); // sim 没灌 HERO_INFO → 武将名回退 gid(worker 里是「魔吕布」)
+  rm.setGeneral("h2", 2, "24");
+  check("同一局继续选将:id 不变", rm.gameRecord().id === r1.id && rm.gameRecord().seats[1].general === "24"); // 没灌 HERO_INFO 时回退 gid
+  rm.newGame("h1");
+  check("新一局 → 新 id,清空后没人选将不记录", rm.game.id !== r1.id && rm.gameRecord() === null);
+  rm.identStart("h1", { mode: "normal" });
+  const gid2 = rm.game.id;
+  rm.setGeneral(rm.seats[1].holderDevices[0], 1, "lvbu");
+  check("发身份=新一局;之后选将沿用该局,记录带模式名", rm.gameRecord().id === gid2 && rm.gameRecord().mode === "身份局" && rm.gameRecord().seats[0].role === null);
+  rm.identShowAll("h1");
+  check("全部亮明后记录带身份", rm.gameRecord().seats[0].role === "主公");
+  const g = (k, id) => ({ key: k, opts: [{ id, name: k, gid: String(id), lord: false }] });
+  const pools = { normal: Array.from({ length: 40 }, (_, i) => g("将" + i, 100 + i)), lord: [], forced: null };
+  rm.dealStart("h1", { mode: "normal", lordSeat: null, pools });
+  check("已有人落座后再发将 → 新一局", rm.game.id !== gid2);
+  const nm = new RoomCore("5567", 4, rng); for (let i = 1; i <= 4; i++) nm.claimSeat("k" + i, i);
+  nm.identStart("k1", { mode: "normal" }); const gid3 = nm.game.id;
+  nm.dealStart("k1", { mode: "normal", lordSeat: null, pools });
+  check("刚发完身份(没人选将)就发将 → 沿用同一局", nm.game.id === gid3);
+  const back = RoomCore.hydrate(JSON.parse(JSON.stringify(rm.serialize())));
+  check("局 id 进 serialize/hydrate", back.game && back.game.id === rm.game.id);
+}
+
 // ============ 场景 16:徐荣 暴戾(凶镬发放/三选一结算 + 杀绝濒死+1)============
 console.log("\n=== 场景 16:徐荣 暴戾 ===");
 const roomX = new RoomCore("4812", 4, () => 0); // rng=0 → 结算恒为效果0(灼伤)
