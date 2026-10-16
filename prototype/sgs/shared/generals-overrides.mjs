@@ -22,6 +22,10 @@ export const SKILL_OVERRIDES = {
     "许身": "限定技，当你进入濒死状态时，你可令一名其他角色选择一项：1.其失去所有技能获得“征南”；2.其获得“镇南”。",
   } },
   // 神张角 异兆/肆军/天劫 —— 线下版(比线上更对线下友好)
+  // 谢灵毓(2026-10-16 graduate 9023→769):官网「元嫡」文本里牌名图标组是 {0} 占位,按用户对卡订正为【杀】【闪】【桃】(无【酒】)
+  769: { note: "谢灵毓 元嫡 {0} 占位 → 【杀】【闪】【桃】", skills: {
+    "元嫡": "锁定技，当每回合首次有【杀】【闪】【桃】为一组的牌名均进入过弃牌堆后，你摸一张牌。若其中有牌不因使用进入弃牌堆，且剩余牌名大于一，你移除一个牌名。",
+  } },
   227: { note: "神张角 三技 线下版;房间 app 已改成线下技能=实体卡,一致→无需 cardWarn(用户 2026-07-18 确认)", skills: {
     "异兆": "锁定技，当你使用或打出牌结算结束后，你获得等同于此牌点数的“黄”，然后若“黄”标记数的十位数以此法改变，你摸一张牌。",
     "肆军": "准备阶段，若“黄”标记数大于牌堆的牌数，你可以弃置所有“黄”，亮出牌堆顶的一张牌并重复此流程直到以此法亮出的牌点数之和不小于36，然后你获得以此法亮出的所有牌。",
@@ -240,61 +244,6 @@ export const OFFLINE_HEROES = [
     avatar: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/skinShop/50701.png",
     tool: null, offline: true,
   },
-  // ───── 2026-09-30 用户报 OL 新上四将(官网花名册 692 仍未收录,olwiki 有真 id)。graduate 候选:770/769/679/748。
-  {
-    id: 9022, name: "谋周瑜", genre: "谋", series: "谋", faction: "吴",
-    factionSelectable: false, quality: "限定", hp: 4, initialHp: null,
-    tags: ["攻击", "控制"],
-    skills: [
-      { name: "醉锋", effect: "出牌阶段限X次（X为你的体力上限），你可弃置一个花色的唯一手牌并选择一名角色，你观看其的手牌并展示其中一张。若弃置牌与展示牌花色相同，你对其造成1点火焰伤害。其可将此牌当【酒】对你使用。" },
-      { name: "顾曲", effect: "锁定技，你的回合内：被展示过的手牌称为“阙”；手牌中有“阙”的其他角色只能使用“阙”；当有“阙”被使用后，你摸两张牌。" },
-    ],
-    characteristic: "操纵全场展示牌，拥有灵活的直伤能力，可以转化多张酒。",
-    cover: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/big/static/77000.png",
-    avatar: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/skinShop/77000.png",
-    tool: null, offline: true,
-  },
-  // 谢灵毓 —— 「元嫡」olwiki 原文含 {0} 占位(卡面为牌名图标组),用户 2026-10-01 对卡订正为【杀】【闪】【桃】(无【酒】)
-  {
-    id: 9023, name: "谢灵毓", genre: "璀璨星河", series: "标", faction: "吴",
-    factionSelectable: false, quality: "传说", hp: 3, initialHp: null,
-    tags: ["爆发", "过牌"],
-    skills: [
-      { name: "元嫡", effect: "锁定技，当每回合首次有【杀】【闪】【桃】为一组的牌名均进入过弃牌堆后，你摸一张牌。若其中有牌不因使用进入弃牌堆，且剩余牌名大于一，你移除一个牌名。" },
-      { name: "心幽", effect: "出牌阶段限一次，你可弃置任意张基本牌，然后摸一张牌，并重复此流程，直到你因此获得未弃置基本牌的牌名（至多摸5且本回合不计入手牌上限）。" },
-    ],
-    characteristic: "基本牌进入弃牌堆获取收益，可以创造大量过牌。",
-    cover: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/big/static/76900.png",
-    avatar: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/skinShop/76900.png",
-    tool: "xielingyu", offline: true, // 元嫡牌名组台账(2026-10-10)
-  },
-  {
-    id: 9024, name: "逢纪", genre: "璀璨星河", series: "标", faction: "群",
-    factionSelectable: false, quality: "传说", hp: 3, initialHp: null,
-    tags: ["控制"],
-    skills: [
-      { name: "愎果", effect: "摸牌阶段结束时，你可弃置一张牌，从牌堆中展示并获得每个类型的牌各一张。然后你本回合成为牌的目标后，你可以拼点，没赢的角色本回合不能使用或打出与双方拼点牌类型相同的牌。" },
-      { name: "斗誉", effect: "你的拼点牌亮出前，你可以与对方交换拼点牌，若你赢，你摸两张牌。" },
-    ],
-    characteristic: "可以通过拼点限制他人出牌，拼点时可以与对手的拼点牌交换。",
-    cover: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/big/static/67900.png",
-    avatar: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/skinShop/67900.png",
-    tool: null, offline: true,
-  },
-  {
-    id: 9025, name: "族荀灌", genre: "门阀士族", series: "族", faction: "群",
-    factionSelectable: false, quality: "传说", hp: 4, initialHp: null,
-    tags: ["控制", "攻击"],
-    skills: [
-      { name: "遁迹", effect: "锁定技，当你每回合首次使用黑色牌后，你令一名角色用一张手牌交换此牌。" },
-      { name: "云影", effect: "锁定技，每个结束阶段，上次“遁迹”目标角色每满足一项，你便执行一项：1.本回合扣减过体力，你将所有黑色手牌当无距离限制的【杀】使用；2.本回合失去过手牌，你将手牌摸至X张（X为本回合弃牌堆中黑色牌数且至多为5）。" },
-      { name: "蹈节", effect: "宗族技，锁定技，当你每回合首次使用非伤害锦囊牌后，你失去1点体力或一个锁定技令一名同族角色获得此牌。" },
-    ],
-    characteristic: "技能发动较灵活，要关注全场黑色牌流向。",
-    cover: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/big/static/74800.png",
-    avatar: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/skinShop/74800.png",
-    tool: null, offline: true,
-  },
   // 司马炎 —— 线下/OL未收录(用户提供文本+插画 assets/heroes/simayan.jpg)。晋主公,3血(用户 2026-07-13 确认)。
   {
     id: 9007, name: "司马炎", genre: "其他", series: "标", faction: "晋",
@@ -323,6 +272,20 @@ export const OFFLINE_HEROES = [
     characteristic: "藏巧取折戟/女装/驽马三神装并摸至上限，神机把装备当延时锦囊，化朽升级为魂装。",
     cover: "https://initial-jie.github.io/sgs-wiki/assets/heroes/shenhuangyueying.jpg",
     avatar: "https://initial-jie.github.io/sgs-wiki/assets/heroes/shenhuangyueying.jpg",
+    tool: null, offline: true,
+  },
+  // 谋田丰 —— olwiki 真 id 659(官网花名册 2026-10-16 仍未收录),用户报 OL 当日上线;graduate 候选。技能文本抄自 olwiki(去掉"爆发/卖血"定位角标)
+  {
+    id: 9026, name: "谋田丰", genre: "谋", series: "谋", faction: "群",
+    factionSelectable: false, quality: "传说", hp: 3, initialHp: null,
+    tags: ["控制", "过牌"],
+    skills: [
+      { name: "执谏", effect: "出牌阶段限一次，你可以摸3-X张牌并交给一名其他角色一张牌，此牌称为“谏”至其下个回合结束时。然后若其使用的下一张牌不为“谏”，你可再对其发动此技能（X为此技能本回合此前已发动次数）。" },
+      { name: "效竭", effect: "当你成为【杀】的目标后，你可令你不可响应之。若如此做，你于此【杀】结算完毕后，视为使用你使用的上一张普通锦囊牌或摸一张牌。" },
+    ],
+    characteristic: "能够转化锦囊牌，对同目标连续发动技能收益较高。",
+    cover: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/big/static/65900.png",
+    avatar: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/skinShop/65900.png",
     tool: null, offline: true,
   },
 ];
