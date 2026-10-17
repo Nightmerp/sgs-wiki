@@ -137,6 +137,7 @@
 - **临时 ban 池** = `/pool` 页第三个页签(`pools[key].temp`,SgsConfigDO 存;该环境为空沿用军争,同白名单规则)。发将设置勾「本局临时 ban」→ worker 取 临时 ban 池 ∩ 本局将池 作候选 → `core.dealStart(…,{tempBan})` 进 **ban 阶段**(`deal.phase="ban"`,`deal.ban={k,cands,picked}`,`deal.prep` 存着发手牌要用的全部参数):每人 k=min(5, floor(候选÷人数)) 个候选(互不重复),**k<3 → `TEMPBAN_TOO_SMALL`,发将不开始**;各人 `dealBan{seatNo,heroId}` ban n 个(≤6 人 2 个,否则 1 个,2026-10-18)(只 ban 该版本,`dropIdsFromPools` 按 id 剔、整坑空才删、专属君主被剔则 forced=null;ban 结果立即公开,不可改);全员 ban 完 → `_dealHands(prep, banned)` 发手牌进 pick 阶段。ban 阶段 dealPick/dealSwap/dealReveal 全拒 `BAN_PHASE`;可中止。候选只给本人(`banCands`),旁人只见「待 ban / ban 了谁」。
 - **排除今日已登场**(小伙伴 idea,默认关):worker 读 `/api/history`(config DO 内部调用),取 **北京时间当天** t0 的记录里所有已落座武将名 → 按版本从本局将池剔除(`deal.excluded` 公开展示剔了几个);剔完不够发 → `POOL_TOO_SMALL`,提示关掉它。
 - 开关记本机(localStorage `sgs_dealTempBan`)。**「排除今日已登场」用户当天就决定太一刀切 → 已隐藏**(room.html 发将设置那行 `display:none`,服务端 `excludeToday` 逻辑保留,去掉 display:none 即恢复)。
+- **测试版房规(2026-10-18)**:SP赵云 体力上限 3→**4** + 〖冲阵〗改写(龙胆使用/打出时 获得手牌 / 造成 1 点伤害 二选一;令其失去最后手牌或濒死则摸两张)——`SKILL_OVERRIDES[108]`,**`applyOverrides` 新支持 `hp` 字段覆盖体力上限**(改回=删那条再 rebake)。
 - **测试版房规(2026-10-17,用户说后续可能改回)**:族荀淑「八龙」摸至与存活角色数相同 → **固定摸至 8 张**(`SKILL_OVERRIDES[522]` + cardWarn 标「测试版房规」;改回=删那条再 rebake)。`_dealView` 现带 `phase/banK/banned/excluded`;老存档无 phase 当 pick。
 - 评估(给用户的):临时 ban 合理;「今日已登场」作为可选开关可以,但多局之后池子会明显缩水(军争池 ~190 将,8 人局每局用掉 8 个,第 4 局后 6 坑×8 人=48 坑仍够,但同名坑合并后可能吃紧),所以做成默认关 + 不够发时报错而不是悄悄放宽。
 
