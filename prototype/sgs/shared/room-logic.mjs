@@ -532,7 +532,14 @@ export class RoomCore extends RoomBase {
     // 明忠(主公是暗的)/无间道:不发主公技候选(用户 2026-10-02),但仍有「先选先亮」的人(firstSeats):
     //   明忠 = 亮明的明忠/储君本人;无间道 = 两名主帅(各自暗选,都选定后一起亮出)。其余人随后暗选、一起亮出。
     let lordExtra = true, lordTitle = DEAL_MODES[mode].lordTitle, firstSeats = null;
-    if (this.ident && IDENT_MODES[this.ident.mode]?.noLord) {
+    const dm = DEAL_MODES[mode], hand = dm.hand || DEAL_HAND;
+    if (dm.noLordPool) { lordExtra = false; firstSeats = []; } // 斗地主:无主公技候选、无先选先亮;地主由叫地主阶段决定
+    if (dm.call) { // 叫地主:候选 = 传入的 lordSeat(身份局里=地主座位),默认 1 号位;不在场则取第一个玩家
+      const cand = lordSeat != null && players.includes(lordSeat) ? lordSeat : (players.includes(1) ? 1 : players[0]);
+      lordSeat = null; firstSeats = [];
+      var callPrep = { cand, order: [...players.slice(players.indexOf(cand)), ...players.slice(0, players.indexOf(cand))], passed: [] };
+    }
+    if (!dm.call && this.ident && IDENT_MODES[this.ident.mode]?.noLord) {
       lordExtra = false;
       if (this.ident.mode === "mingzhong") {
         const first = players.find((n) => this.ident.roles[n]?.title);
@@ -546,9 +553,10 @@ export class RoomCore extends RoomBase {
     }
     if (lordSeat != null && !players.includes(lordSeat)) return { error: "BAD_LORD" };
     if (!firstSeats) firstSeats = lordSeat != null ? [lordSeat] : [];
-    const prep = { mode, lordSeat, lordExtra, lordTitle, firstSeats, players, poolKey, poolLabel, excluded: excluded || null,
+    const prep = { mode, lordSeat, lordExtra, lordTitle, firstSeats, players, poolKey, poolLabel, excluded: excluded || null, hand, call: typeof callPrep !== "undefined" ? callPrep : null,
       pools: { normal: pools?.normal || [], lord: pools?.lord || [], forced: pools?.forced || null } };
-    if ((prep.pools.normal.length) < players.length * DEAL_HAND) return { error: "POOL_TOO_SMALL", need: players.length * DEAL_HAND, have: prep.pools.normal.length };
+    const need = players.length * hand + (dm.lordExtraHand || 0);
+    if ((prep.pools.normal.length) < need) return { error: "POOL_TOO_SMALL", need, have: prep.pools.normal.length };
     for (const n of players) this.seats[n].genLocked = false; // 重新发将 → 解锁上一局发的武将
     if (!this.ident || this.seatNos().some((n) => this.seats[n].general)) this._newGame(); // 发将=新一局(刚发完身份的那局除外,沿用同一条记录)
 
@@ -583,9 +591,35 @@ export class RoomCore extends RoomBase {
     }
     return { ok: true };
   }
+  // 叫地主(斗地主):当前候选决定 叫(多 2 坑,成为地主)/ 不叫(顺位给下家);转满一圈没人叫 → 最初候选必须当
+  dealCall(id, { seatNo, call }) {
+    seatNo = Number(seatNo);
+    const d = this.deal; if (!d) return { error: "NO_DEAL" };
+    if (d.phase !== "call") return { error: "NOT_CALL_PHASE" };
+    if (!this.isHolder(id, seatNo)) return { error: "NOT_HOLDER" };
+    if (d.call.cand !== seatNo) return { error: "NOT_YOUR_CALL" };
+    if (call) return this._becomeLandlord(seatNo, false);
+    d.call.passed.push(seatNo);
+    const order = d.call.order.filter((n) => this.seats[n] && d.hands[n]);
+    const next = order.find((n) => !d.call.passed.includes(n));
+    if (next == null) return this._becomeLandlord(d.call.order[0], true); // 没人叫:最初候选必须当
+    d.call.cand = next;
+    return { ok: true, cand: next };
+  }
+  _becomeLandlord(seatNo, forced) {
+    const d = this.deal, extra = DEAL_MODES[d.mode].lordExtraHand || 0, hand = d.hands[seatNo];
+    for (let k = 0; k < extra; k++) { const g = this._dealDraw(d.pool); if (!g) break; hand.slots.push({ key: g.key, opts: g.opts, src: "init", swapped: false }); hand.initKeys.push(g.key); }
+    d.lordSeat = seatNo; d.call = { ...d.call, done: true, landlord: seatNo, forced: !!forced }; d.phase = "pick";
+    if (this.ident && this.ident.roles[seatNo]) { // 身份跟着走:地主换人
+      for (const r of Object.values(this.ident.roles)) if (r.role === "地主") r.role = "农民";
+      this.ident.roles[seatNo].role = "地主";
+    }
+    return { ok: true, landlord: seatNo, forced: !!forced, phase: "pick" };
+  }
   // 真正发手牌(prep=dealStart 算好的参数;banned=临时 ban 掉的 [{heroId,name}],按版本剔除)
   _dealHands(prep, banned) {
     const { mode, lordSeat, lordExtra, lordTitle, firstSeats, poolKey, poolLabel, excluded } = prep;
+    const hand = prep.hand || DEAL_HAND;
     const players = prep.players.filter((n) => this.seats[n]);
     const pools = dropIdsFromPools(prep.pools, banned.map((b) => b.heroId));
     const normal = pools.normal.map((g) => ({ key: g.key, opts: g.opts }));
@@ -603,9 +637,9 @@ export class RoomCore extends RoomBase {
       for (const g of extras) hands[lordSeat].slots.push({ key: g.key, opts: g.opts, src: "lord", swapped: false });
     }
     // 2) 每人起手 DEAL_HAND 坑
-    if (normal.length < players.length * DEAL_HAND) return { error: "POOL_TOO_SMALL", need: players.length * DEAL_HAND, have: normal.length };
+    if (normal.length < players.length * hand) return { error: "POOL_TOO_SMALL", need: players.length * hand, have: normal.length };
     for (const n of players) {
-      for (let k = 0; k < DEAL_HAND; k++) {
+      for (let k = 0; k < hand; k++) {
         const g = this._dealDraw(normal);
         hands[n].slots.push({ key: g.key, opts: g.opts, src: "init", swapped: false });
         hands[n].initKeys.push(g.key);
@@ -613,14 +647,17 @@ export class RoomCore extends RoomBase {
     }
     // lordSeat=拿主公技候选的君主座位(明忠模式=明忠座位,无额外候选);firstSeats=先选先亮的座位(君主 / 明忠 / 无间道两主帅),lordTitle=其称谓
     // banned=本局临时 ban 掉的(公开);excluded=按「今日已登场」剔掉的武将名(公开,仅展示)
-    this.deal = { phase: "pick", mode, lordSeat, firstSeats, lordTitle, lordPicked: false, hands, pool: normal, poolKey, poolLabel, banned, excluded }; // poolKey/Label:用的是哪个环境的名单(仅展示)
-    return { ok: true, players: players.length };
+    // call(斗地主叫地主阶段):{cand,order,passed,done?,landlord?,forced?};叫地主期间 phase="call",不能选将/换将
+    const call = prep.call ? { cand: prep.call.cand, order: prep.call.order, passed: [] } : null;
+    this.deal = { phase: call ? "call" : "pick", mode, lordSeat, firstSeats, lordTitle, lordPicked: false, hands, pool: normal, poolKey, poolLabel, banned, excluded, call }; // poolKey/Label:用的是哪个环境的名单(仅展示)
+    return { ok: true, players: players.length, phase: this.deal.phase };
   }
   // 换将:起手坑各可换一次 —— 原坑放回将池,重抽一个不与自己起手 6 坑重复的;换来的坑不可再换
   dealSwap(id, { seatNo, slot }) {
     seatNo = Number(seatNo); slot = Number(slot);
     if (!this.deal) return { error: "NO_DEAL" };
     if (this.deal.phase === "ban") return { error: "BAN_PHASE" };
+    if (this.deal.phase === "call") return { error: "CALL_PHASE" };
     if (!this.isHolder(id, seatNo)) return { error: "NOT_HOLDER" };
     const hand = this.deal.hands[seatNo]; if (!hand) return { error: "NOT_IN_DEAL" };
     if (hand.pick && hand.pick.final) return { error: "ALREADY_PICKED" };
@@ -638,6 +675,7 @@ export class RoomCore extends RoomBase {
     seatNo = Number(seatNo); slot = Number(slot); heroId = Number(heroId);
     const d = this.deal; if (!d) return { error: "NO_DEAL" };
     if (d.phase === "ban") return { error: "BAN_PHASE" };
+    if (d.phase === "call") return { error: "CALL_PHASE" };
     if (!this.isHolder(id, seatNo)) return { error: "NOT_HOLDER" };
     const hand = d.hands[seatNo]; if (!hand) return { error: "NOT_IN_DEAL" };
     if (hand.pick && hand.pick.final) return { error: "ALREADY_PICKED" };
@@ -658,6 +696,7 @@ export class RoomCore extends RoomBase {
   dealReveal(id) {
     const d = this.deal; if (!d) return { error: "NO_DEAL" };
     if (d.phase === "ban") return { error: "BAN_PHASE" };
+    if (d.phase === "call") return { error: "CALL_PHASE" };
     if (!this.devices[id]) return { error: "NO_DEVICE" };
     const seats = Object.keys(d.hands).map(Number).filter((n) => this.seats[n]); // 发将途中被减掉的座位跳过
     if (seats.some((n) => !d.hands[n].pick)) return { error: "NOT_ALL_PICKED" };
@@ -715,6 +754,7 @@ export class RoomCore extends RoomBase {
     } else {
       const leads = players.filter((n) => m.lead.includes(roles[n].role));
       for (const n of leads) roles[n].shown = true;
+      if (m.allShown) for (const n of players) roles[n].shown = true; // 斗地主:身份全公开
       leadSeat = this._pickOne(leads); // 无间道:两名主帅随机其一
     }
     // 4) 转座
@@ -860,7 +900,8 @@ export class RoomCore extends RoomBase {
       if (mine) { seats[n].slots = clone(hand.slots); seats[n].pick = hand.pick ? clone(hand.pick) : null; }
       else if (hand.pick && hand.pick.final) seats[n].pick = { heroId: hand.pick.heroId, name: hand.pick.name, final: true }; // 君主已亮出
     }
-    return { phase: "pick", mode: d.mode, lordSeat: d.lordSeat, firstSeats: d.firstSeats ?? (d.lordSeat != null ? [d.lordSeat] : []), lordTitle: d.lordTitle ?? null, lordPicked: d.lordPicked, seats, picked, total, poolLeft: d.pool.length, poolKey: d.poolKey ?? null, poolLabel: d.poolLabel ?? null,
+    return { phase: d.phase || "pick", mode: d.mode, lordSeat: d.lordSeat,
+      call: d.call ? { cand: d.call.cand, order: d.call.order, passed: d.call.passed, done: !!d.call.done, landlord: d.call.landlord ?? null, forced: !!d.call.forced } : null, firstSeats: d.firstSeats ?? (d.lordSeat != null ? [d.lordSeat] : []), lordTitle: d.lordTitle ?? null, lordPicked: d.lordPicked, seats, picked, total, poolLeft: d.pool.length, poolKey: d.poolKey ?? null, poolLabel: d.poolLabel ?? null,
       banned: (d.banned || []).map((b) => b.name), excluded: d.excluded || null };
   }
 

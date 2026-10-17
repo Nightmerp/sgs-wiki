@@ -21,6 +21,8 @@ export const DEAL_MODES = {
   baonue:  { label: "暴虐无道", lordTitle: "暴君", lordHero: "暴君董卓" },
   shixin:  { label: "失心疯",   lordTitle: "教主", lordHero: "教主张角" },
   dazhong: { label: "大忠似奸", lordTitle: "昏君", lordHero: "昏君刘宏" },
+  // 斗地主(用户 2026-10-17):每人 3 坑、无主公技候选;发完有「叫地主」阶段,叫了的地主再多 2 坑(也可各换一次),不叫则顺位给下家,转满一圈没人叫 → 最初那位必须当
+  douzhu:  { label: "斗地主",   lordTitle: "地主", lordHero: null, hand: 3, lordExtraHand: 2, call: true, noLordPool: true },
 };
 
 const LORD_ONLY_KEYS = new Set(["曹丕"]);

@@ -236,7 +236,8 @@ export class RoomDO extends RoomDOBase {
       case "setFaction": return core.setFaction(id, msg.seatNo, msg.faction);        // 神将自选势力
       // ── 线上发将 ──
       case "dealStart": return this.dealStart(id, msg, core);                        // async:先读全局将池白名单
-      case "dealBan": return core.dealBan(id, msg);                                 // 本局临时 ban:各人 ban 一个
+      case "dealBan": return core.dealBan(id, msg);
+      case "dealCall": return core.dealCall(id, msg);                               // 斗地主:叫 / 不叫                                 // 本局临时 ban:各人 ban 一个
       case "dealSwap": return core.dealSwap(id, msg);
       case "dealPick": return core.dealPick(id, msg);
       case "dealReveal": return core.dealReveal(id);

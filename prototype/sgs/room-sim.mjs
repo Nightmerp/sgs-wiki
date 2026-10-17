@@ -1474,7 +1474,7 @@ console.log("\n=== 场景 20:线上发将 ===");
       }
       for (const g of rm.deal.pool) for (const o of g.opts) if (exIds.has(o.id)) stray++;
     }
-    check("⭐ 模式专属君主不越界(4 模式×有/无君主×40 种子,含全员换将后与剩余将池)", stray === 0 && runs === 320);
+    check("⭐ 模式专属君主不越界(各模式×有/无君主×40 种子,含全员换将后与剩余将池)", stray === 0 && runs === Object.keys(DEAL_MODES).length * 80);
     check("对应模式且有君主时,专属君主必在君主额外候选里", forcedOk === 3 * 40);
   }
 }
@@ -1802,6 +1802,41 @@ console.log("\n=== 场景 20:线上发将 ===");
       const r = rm.dealStart("b1", { mode: "normal", lordSeat: null, pools: mkPools(), excluded: ["费祎", "SP曹操"] });
       check("不开临时 ban:直接 pick 阶段;excluded 仅展示", r.ok && rm.deal.phase === "pick" && rm.viewFor("b1").deal.phase === "pick" && rm.viewFor("b1").deal.excluded.join() === "费祎,SP曹操" && rm.viewFor("b1").deal.banned.length === 0);
     }
+  }
+  // ───────── 斗地主:每人 3 坑、叫地主阶段(叫=+2 坑;不叫=顺位给下家;转满一圈没人叫=最初候选必须当)─────────
+  {
+    const mk = (seed) => { let x = seed * 7919; return () => (x = (x * 1103515245 + 12345) % 2147483648) / 2147483648; };
+    const g = (k, id) => ({ key: k, opts: [{ id, name: k, gid: String(id), lord: false }] });
+    const pools = () => ({ normal: Array.from({ length: 30 }, (_, i) => g("将" + i, 100 + i)), lord: [g("曹丕", [43])], forced: null });
+    const room = (seed) => { const rm = new RoomCore("t", 3, mk(seed)); for (let i = 1; i <= 3; i++) rm.claimSeat("d" + i, i); return rm; };
+    // 身份:斗地主 3 人,地主亮明坐 1 号位,农民也公开
+    const rm = room(1);
+    rm.identStart("d1", { mode: "douzhu" });
+    const v = (dev) => rm.viewFor(dev).ident, dev = (n) => rm.seats[n].holderDevices[0]; // 发身份会转座,按座位取持有设备
+    check("斗地主身份:地主 1 名坐 1 号位,农民 2 名,全部公开", rm.ident.roles[1].role === "地主" && [2, 3].every((n) => rm.ident.roles[n].role === "农民") && Object.values(v("zz").seats).map((x) => x.pub).join() === "地主,农民,农民");
+    // 发将:每人 3 坑,进叫地主阶段,候选=地主(1 号位)
+    const r = rm.dealStart(dev(1), { mode: "douzhu", lordSeat: 1, pools: pools() });
+    const d = rm.deal;
+    check("⭐ 斗地主发将:每人 3 坑、无主公技候选、进 call 阶段,候选=座位 1,顺序 1→2→3", r.ok && r.phase === "call" && d.phase === "call" && [1, 2, 3].every((n) => d.hands[n].slots.length === 3) && d.call.cand === 1 && d.call.order.join() === "1,2,3" && d.lordSeat === null);
+    check("叫地主阶段不能选将/换将/亮出", rm.dealPick(dev(1), { seatNo: 1, slot: 0, heroId: d.hands[1].slots[0].opts[0].id }).error === "CALL_PHASE" && rm.dealSwap(dev(1), { seatNo: 1, slot: 0 }).error === "CALL_PHASE" && rm.dealReveal(dev(1)).error === "CALL_PHASE");
+    check("不是当前候选不能叫;别人不能替叫", rm.dealCall(dev(2), { seatNo: 2, call: true }).error === "NOT_YOUR_CALL" && rm.dealCall(dev(2), { seatNo: 1, call: true }).error === "NOT_HOLDER");
+    check("座位 1 不叫 → 候选顺位到 2,身份暂不变", rm.dealCall(dev(1), { seatNo: 1, call: false }).cand === 2 && d.call.cand === 2 && d.call.passed.join() === "1" && rm.viewFor(dev(3)).deal.call.cand === 2);
+    const r2 = rm.dealCall(dev(2), { seatNo: 2, call: true });
+    check("⭐ 座位 2 叫地主:多 2 坑(共 5,皆可换)、成为地主、身份跟着换、进 pick 阶段", r2.ok && r2.landlord === 2 && !r2.forced && d.phase === "pick" && d.hands[2].slots.length === 5 && d.hands[2].slots.every((s) => s.src === "init") && d.hands[1].slots.length === 3 && d.lordSeat === 2
+      && rm.ident.roles[2].role === "地主" && rm.ident.roles[1].role === "农民" && rm.viewFor(dev(1)).deal.call.landlord === 2);
+    check("叫完后 dealCall 拒;换将照旧(各可换一次,含地主多出来的 2 坑)", rm.dealCall(dev(2), { seatNo: 2, call: true }).error === "NOT_CALL_PHASE" && rm.dealSwap(dev(2), { seatNo: 2, slot: 4 }).ok && d.hands[2].slots[4].src === "swap" && rm.dealSwap(dev(2), { seatNo: 2, slot: 4 }).error === "CANT_SWAP");
+    check("没有先选先亮:农民可直接暗选", rm.dealPick(dev(1), { seatNo: 1, slot: 0, heroId: d.hands[1].slots[0].opts[0].id }).ok && !d.hands[1].pick.final);
+    // 转满一圈没人叫 → 最初候选必须当
+    const r3 = room(2); r3.dealStart("d1", { mode: "douzhu", lordSeat: 3, pools: pools() });
+    check("候选可指定为座位 3:顺序 3→1→2", r3.deal.call.cand === 3 && r3.deal.call.order.join() === "3,1,2");
+    r3.dealCall("d3", { seatNo: 3, call: false }); r3.dealCall("d1", { seatNo: 1, call: false });
+    const r4 = r3.dealCall("d2", { seatNo: 2, call: false });
+    check("⭐ 三人都不叫 → 最初候选(座位 3)被迫当地主,多 2 坑", r4.ok && r4.forced && r4.landlord === 3 && r3.deal.phase === "pick" && r3.deal.hands[3].slots.length === 5 && r3.deal.hands[2].slots.length === 3);
+    // 临时 ban 先于叫地主
+    const r5 = room(3); r5.dealStart("d1", { mode: "douzhu", lordSeat: 1, pools: pools(), tempBan: Array.from({ length: 9 }, (_, i) => ({ id: 100 + i, name: "T" + i, gid: String(100 + i) })) });
+    check("斗地主 + 临时 ban:先 ban 再叫地主", r5.deal.phase === "ban" && [1, 2, 3].every((n) => r5.dealBan("d" + n, { seatNo: n, heroId: r5.deal.ban.cands[n][0].id }).ok) && r5.deal.phase === "call" && [1, 2, 3].every((n) => r5.deal.hands[n].slots.length === 3));
+    check("call 阶段的 deal 进 serialize/hydrate", (() => { const h = RoomCore.hydrate(JSON.parse(JSON.stringify(r5.serialize()))); return h.deal.phase === "call" && h.dealCall("d1", { seatNo: 1, call: true }).ok && h.deal.hands[1].slots.length === 5; })());
+    check("将池不够(3 人×3+2)→ POOL_TOO_SMALL", room(4).dealStart("d1", { mode: "douzhu", lordSeat: 1, pools: { normal: Array.from({ length: 10 }, (_, i) => g("将" + i, 100 + i)), lord: [], forced: null } }).error === "POOL_TOO_SMALL");
   }
   // 线上发将亮出的武将锁定,不可再手动改;新一局 / 重新发将才解
   {

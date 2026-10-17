@@ -55,6 +55,11 @@ export const IDENT_MODES = {
       义军: ["你的胜利条件不变(昏君死亡)。", "奸臣阵亡时:忠臣数 ≥ 义军数 → 昏君只需杀光忠臣即胜;忠臣数 < 义军数 → 昏君并入忠臣阵营,与你为敌。"],
     },
   },
+  douzhu: { // 斗地主:3 人,地主 1 农民 2;身份全公开(地主亮明,其余自然是农民);地主 +1 上限 +1 血(面板手动)。发将时地主可「不叫」顺位给下家
+    label: "斗地主", roles: ["地主", "农民"], lead: ["地主"], official: [3, 3], rule: "douzhu", noLord: true, allShown: true,
+    table: T([[3, 1, 2]]),
+    win: { 地主: "两名农民都死亡。体力上限与体力各 +1(面板手动改)。发将时可以不叫,地主顺位给下家。", 农民: "地主死亡。两名农民是队友。" },
+  },
   wujian: {
     label: "无间道", roles: ["龙主帅", "龙护卫", "龙内鬼", "虎主帅", "虎护卫", "虎内鬼"], lead: ["龙主帅", "虎主帅"], official: [8, 8], rule: "wujiandao", camps: true, noLord: true,
     table: T([[4, 1, 0, 1, 1, 0, 1], [6, 1, 1, 1, 1, 1, 1], [8, 1, 2, 1, 1, 2, 1], [10, 1, 3, 1, 1, 3, 1]]),
@@ -112,7 +117,7 @@ export function identModesForClient() {
   for (const [k, m] of Object.entries(IDENT_MODES)) {
     const defaults = {};
     for (const n of Object.keys(m.table)) defaults[n] = identDefaults(k, Number(n));
-    out[k] = { label: m.label, roles: m.roles, lead: m.lead, official: m.official, rule: m.rule || null, lost: !!m.lost, camps: !!m.camps, noLord: !!m.noLord, win: m.win, defaults };
+    out[k] = { label: m.label, roles: m.roles, lead: m.lead, official: m.official, rule: m.rule || null, lost: !!m.lost, camps: !!m.camps, noLord: !!m.noLord, allShown: !!m.allShown, win: m.win, defaults };
   }
   return out;
 }

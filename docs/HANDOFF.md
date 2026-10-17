@@ -1,6 +1,6 @@
 # SGS-Wiki 线下房间 · 交接文档
 
-> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **817 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
+> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **830 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
 
 ## ⭐⭐ 2026-09-24:多游戏架构 + 风声(游卡典藏版)房间 v1 —— 新会话先读这段,再读下面三国杀状态
 
@@ -24,7 +24,7 @@
 
 ## ⭐ 最新状态(2026-09-22,graduate + 3 新将 + 谋程昱工具 + 神典韦池扩到 33,全部 push 到 main)—— 新会话先读这段
 
-**基线**:`node prototype/sgs/room-sim.mjs` → **817 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
+**基线**:`node prototype/sgs/room-sim.mjs` → **830 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
 
 **规模**:武将库 **711 将**(696 OL = 官网花名册全量 + 15 手录/线下,含《不臣之君》3 模式将)· 房间工具 **24 个** · 装备库 **58 张** · 选将支持拼音。
 
@@ -84,7 +84,7 @@
 
 ## ✅ 身份自动发放 + 发将武将锁定 + 新一局(2026-10-01,待 deploy)
 
-**基线**:room-sim **817**。
+**基线**:room-sim **830**。
 
 **发将亮出的武将锁定**:`seat.genLocked`(dealPick 君主 / dealReveal 落座时置 true)→ `setGeneral` 拒 `GENERAL_LOCKED`,座位卡不再给「选武将 ▾」。手动选将的座位不锁、下拉照旧。解锁 = 重新发将(参与座位)/ 发身份时清空武将 / 房间设置「🔄 新一局」(`newGame`:清全场武将+身份+进行中的发将,座位与持有者不动)。
 
@@ -115,7 +115,12 @@
 
 **⚠ Cloudflare 免费额度告警(2026-10-06)→ DO WebSocket 改休眠模式(`common/room-do.mjs`,待 deploy)**:邮件「Durable Objects daily operation limit 90%」超的是 **duration(GB·s)** 不是请求数。原因:原先 `ws.accept()+addEventListener` 是非休眠 WebSocket,只要有一个连接挂着(手机后台留着页面、客户端自动重连)DO 就常驻内存按时长计费;免费额度 13,000 GB·s/天 ≈ 一个 128MB DO 活 29 小时,几间房各挂一台手机就超。现改为 **Hibernation API**:`state.acceptWebSocket(ws)` + `webSocketMessage/webSocketClose/webSocketError` 回调;连接↔deviceId 存 `ws.serializeAttachment({d})`(不能存 this 上,休眠会丢);`sockets()=state.getWebSockets()`;`this.core` 休眠后为 null 由 ensureCore 回灌;没人在线时 onClose 不回灌 core(让 DO 尽快空闲)。三国杀/风声共用同一基类,行为不变(本地双标签验过 认领/改名/广播/断线重连/解散/风声)。⚠ 本地 wrangler dev 里客户端直接关页面会打一行 `Uncaught Error: Network connection lost`——是运行时对异常断开的日志,无害。**deploy 后用量看**:dash.cloudflare.com → Workers & Pages → Durable Objects → 看 Duration 曲线应明显掉下来;若还高,再查 alarm/其它。
 
-**⭐ 2026-10-17 续:花色台账扫全库 +3 将;OL 孙寒华手录(库 **711**,**32 工具**,待 deploy)**:
+**⭐ 2026-10-17 斗地主(发身份 + 发将叫地主,待 deploy;room-sim **830**)**:
+- **身份** `IDENT_MODES.douzhu`:3 人,地主 1 农民 2,`allShown`(全部公开),地主转到 1 号位;规则集加「斗地主」(id douzhu,含本桌叫地主)。
+- **发将** `DEAL_MODES.douzhu`:`hand:3`(每人 3 坑)、`noLordPool`(无主公技候选、无先选先亮)、`call:true` → `_dealHands` 后进 **call 阶段**(`deal.call={cand,order,passed}`,候选=发将设置里的「君主座位」,默认 1 号位;顺序从候选起按座位号环绕)。`dealCall{seatNo,call}`:叫 → `_becomeLandlord`(从剩余池再抽 `lordExtraHand=2` 坑,src init 可各换一次;`deal.lordSeat`=地主;**身份里的地主跟着换人**);不叫 → 顺位下一位;**转满一圈没人叫 → 最初候选被迫当**(`call.forced`)。call 阶段 dealPick/dealSwap/dealReveal 拒 `CALL_PHASE`;临时 ban 阶段在 call 之前。将池需要 ≥ 3×3+2。
+- 客户端:发将模式下拉加斗地主(选中时出提示);弹层顶部「叫地主 / 不叫」两键(只给当前候选);座位标「? 叫地主 / 不叫 / 地主」;顶部行提示等谁叫。⚠ 地主换人后**不重新转座**(1 号位可能是农民),先手自行按地主算。
+
+ +3 将;OL 孙寒华手录(库 **711**,**32 工具**,待 deploy)**:
 - **扫描口径**:技能文本匹配「每轮/每回合 … 花色 … 首次/限一次/每种花色」。命中且适合台账的只有 **晋司马懿·权变**(出牌阶段首次用/打出一种花色)、**司马昭·昭然**(本阶段每种花色限一次)、**界吕蒙·博图**(本回合弃牌堆含四种花色 → 额外回合)——三者按「回合/出牌阶段」重开而不是「轮」,`SUIT_TRACK_TOOLS` 加了 `period` 字段(只影响文案,reducer 同一套)。其余命中(周瑜反间/神吕蒙涉猎/神甘宁魄袭/卞夫人约俭/蒋干盗书/谋戏志才金烬)是一次性选花色或凑花色,不需要跨回合台账,没做。
 - **OL 孙寒华 = 9027**(olwiki 774,品质「未标注」=测试版,用户已买实体卡;quality 写「测试版」+ cardWarn):华光 + 玄白;**衍生牌【彩莲】** 在 `derived-cards-room.json`(src 写「衍生牌·置入任一装备栏」,build-equipment 自动跳过,不进装备库)、**衍生技 荡魔/济惠/霞举 + 形态说明** 在 `derived-skills-room.json`;皮肤只有经典 77400(alias 9027→774);性别女;包 璀璨星河-少微。graduate 候选 +1(→774)。
 - **线下版 9001 改名「线下孙寒华」**,`heroBaseName` 前缀集加「线下」(deal.mjs + room.html 同步)→ 两个孙寒华同名可替换、发将同一个坑;derived-cards-room 的键跟着改成「线下孙寒华」(刺【杀】)。
