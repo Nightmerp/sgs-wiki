@@ -667,11 +667,11 @@ function openDealSetup(){
     <div class="row" style="margin-bottom:12px"><label style="flex:none;width:64px">君主座位</label><select id="deal-lord" class="grow"><option value="">无君主(不发主公技候选)</option>`
       +held.map(s=>`<option value="${s.seatNo}">座位${s.seatNo} · ${esc(s.holderDevices[0])}</option>`).join("")+`</select></div>
     <div style="margin:-4px 0 8px;font-size:13px"><label><input type="checkbox" id="deal-tempban" style="width:auto"> 本局临时 ban:每人从「临时 ban 池」随机看 3~5 个,各 ban 一个(按版本),本局不出现</label></div>
-    <div style="margin:0 0 12px;font-size:13px"><label><input type="checkbox" id="deal-today" style="width:auto"> 排除今天已登场的武将(按历史对局,北京时间当天;只剔那个版本)</label></div>
+    <div style="margin:0 0 12px;font-size:13px;display:none"><label><input type="checkbox" id="deal-today" style="width:auto"> 排除今天已登场的武将(按历史对局,北京时间当天;只剔那个版本)</label></div><!-- 用户 2026-10-17:太一刀切,先隐藏(服务端 excludeToday 逻辑保留,把 display:none 去掉即恢复) -->
     <div class="row"><button class="primary grow" id="deal-go"${held.length?"":" disabled"}>开始发将</button></div>
     ${held.length?"":'<div class="hint">还没有人入座,先认领座位。</div>'}</div></div>`;
   maskClose();
-  try{ $("#deal-tempban").checked=localStorage.getItem("sgs_dealTempBan")==="1"; $("#deal-today").checked=localStorage.getItem("sgs_dealToday")==="1"; }catch(e){} // 开关记本机
+  try{ $("#deal-tempban").checked=localStorage.getItem("sgs_dealTempBan")==="1"; }catch(e){} // 开关记本机(「排除今日已登场」已隐藏,不再读本机记忆,恒为关)
   { // 本局发过身份 → 模式与君主座位直接带过来(君主=1 号位;明忠/无间道没有先选的君主)
     const im=state.ident&&state.ident.mode, dm={normal:"normal",baonue:"baonue",shixin:"shixin",dazhong:"dazhong"}[im];
     if(dm){ $("#deal-mode").value=dm; if(held.some(s=>s.seatNo===1)) $("#deal-lord").value="1"; }

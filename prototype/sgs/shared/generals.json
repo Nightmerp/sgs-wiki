@@ -11214,14 +11214,15 @@
       },
       {
         "name": "八龙",
-        "effect": "锁定技，当你每回合体力值首次变化后，若你手牌中锦囊牌为唯一最多的类型，你展示手牌并摸至与存活角色数相同。"
+        "effect": "锁定技，当你每回合体力值首次变化后，若你手牌中锦囊牌为唯一最多的类型，你展示手牌并摸至8张。（测试版：原为摸至与存活角色数相同）"
       }
     ],
     "characteristic": "可以跟随全场出牌而转化牌，并在锦囊牌多时卖血过牌。敌人和队友可以利用其频繁暴露手牌信息的特点。",
     "cover": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/xingxiang/52200.png",
     "avatar": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/dianjiang/52200.png",
     "tool": null,
-    "offline": false
+    "offline": false,
+    "cardWarn": "八龙 本桌测试版房规:摸至固定 8 张(原版为摸至与存活角色数相同)。以本房间描述为准,后续可能改回"
   },
   {
     "id": 523,
