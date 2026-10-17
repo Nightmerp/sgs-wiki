@@ -784,6 +784,20 @@ console.log("\n=== 场景 15c2:戏志才 先辅 ===");
   check("序列化存活 + 重开", RoomCore.hydrate(rm.serialize()).seats[1].toolState.revealed === 3 && act(1, { type: "resetGame" }).reset === true && T().revealed === null);
 }
 
+// ============ 场景 15c3:孟达 苟得·变更势力 ============
+console.log("\n=== 场景 15c3:孟达 变更势力 ===");
+{
+  const rm = new RoomCore("3585", 3, () => 0);
+  const d = {}; for (let i = 1; i <= 3; i++) { d[i] = `md${i}`; rm.claimSeat(d[i], i); }
+  rm.setGeneral(d[1], 1, "mengda");
+  const act = (by, o) => rm.action(d[by], { targetSeat: 1, bySeat: by, toolAction: o });
+  check("init:本势力(chosenFaction null)", rm.seats[1].chosenFaction === null && rm.seats[1].toolState.switches === 0);
+  check("非本人不能切;非法势力拒", act(2, { type: "mdFaction", faction: "魏" }).error === "NOT_MD_ACTION" && act(1, { type: "mdFaction", faction: "汉" }).error === "BAD_FACTION");
+  check("⭐ 切到魏:seat.chosenFaction=魏,全场可见", act(1, { type: "mdFaction", faction: "魏" }).ok && rm.seats[1].chosenFaction === "魏" && rm.viewFor(d[2]).seats[1].chosenFaction === "魏" && rm.seats[1].toolState.switches === 1);
+  check("切回本势力:null", act(1, { type: "mdFaction", faction: null }).ok && rm.seats[1].chosenFaction === null && rm.seats[1].toolState.log[0].includes("蜀(本势力)"));
+  check("换将重置势力", act(1, { type: "mdFaction", faction: "吴" }).ok && rm.setGeneral(d[1], 1, "lvbu").ok && rm.seats[1].chosenFaction === null);
+}
+
 // ============ 场景 15d:贾充 凶竖(秘密猜测 + 保密投影 + 揭晓)============
 console.log("\n=== 场景 15d:贾充 凶竖 ===");
 const roomJ = new RoomCore("6420", 4, () => 0);
@@ -1792,14 +1806,17 @@ console.log("\n=== 场景 20:线上发将 ===");
       check("候选只给本人;别人只见 ban 没 ban", v("b1").seats[1].banCands.length === 3 && v("b2").seats[1].banCands === undefined && v("b2").phase === "ban" && v("b2").total === 4 && v("b2").banK === 3);
       check("ban 阶段不能选将/换将/亮出", rm.dealPick("b1", { seatNo: 1, slot: 0, heroId: 100 }).error === "BAN_PHASE" && rm.dealSwap("b1", { seatNo: 1, slot: 0 }).error === "BAN_PHASE" && rm.dealReveal("b1").error === "BAN_PHASE");
       check("只能 ban 自己候选里的;别人不能替你 ban", rm.dealBan("b1", { seatNo: 1, heroId: d.ban.cands[2][0].id }).error === "BAD_PICK" && rm.dealBan("b2", { seatNo: 1, heroId: d.ban.cands[1][0].id }).error === "NOT_HOLDER");
-      const pick = (n) => rm.dealBan("b" + n, { seatNo: n, heroId: d.ban.cands[n][0].id });
-      const banned = [1, 2, 3, 4].map((n) => d.ban.cands[n][0].id);
-      check("前三人 ban:仍在 ban 阶段,ban 结果公开,不能改", pick(1).ok && pick(2).ok && pick(3).ok && rm.deal.phase === "ban" && v("b4").seats[1].ban.heroId === banned[0] && v("b4").picked === 3 && rm.dealBan("b1", { seatNo: 1, heroId: d.ban.cands[1][1].id }).error === "ALREADY_BANNED");
-      const r4 = pick(4);
+      check("4 人(≤6)→ 每人 ban 2 个", d.ban.n === 2 && v("b2").banN === 2);
+      const pick = (n, i = 0) => rm.dealBan("b" + n, { seatNo: n, heroId: d.ban.cands[n][i].id });
+      const banned = [1, 2, 3, 4].flatMap((n) => [d.ban.cands[n][0].id, d.ban.cands[n][1].id]);
+      check("⭐ 第一个 ban 后还差 1 个:公开已 ban 列表、未算完成;同一个不能 ban 两次", pick(1).left === 1 && v("b4").seats[1].ban.length === 1 && v("b4").seats[1].ban[0].heroId === banned[0] && !v("b4").seats[1].picked && v("b4").seats[1].banLeft === 1 && pick(1, 0).error === "ALREADY_BANNED");
+      check("前三人 ban 够 2 个:仍在 ban 阶段,第三个被拒", pick(1, 1).ok && pick(2).ok && pick(2, 1).ok && pick(3).ok && pick(3, 1).ok && rm.deal.phase === "ban" && v("b4").picked === 3 && pick(1, 2).error === "ALREADY_BANNED");
+      pick(4);
+      const r4 = pick(4, 1);
       const d2 = rm.deal;
       const allIds = Object.values(d2.hands).flatMap((h) => h.slots.flatMap((s) => s.opts.map((o) => o.id))).concat(d2.pool.flatMap((g) => g.opts.map((o) => o.id)));
-      check("⭐ 最后一人 ban 完 → 自动发手牌:进 pick 阶段,被 ban 的 4 将不在任何人手里也不在剩余池里,君主照常多主公技坑(池里只有曹丕 1 坑 → 6+1)", r4.phase === "pick" && d2.phase === "pick" && banned.every((id) => !allIds.includes(id)) && d2.hands[1].slots.length === 7 && [2, 3, 4].every((n) => d2.hands[n].slots.length === 6)
-        && v("b2").banned.length === 4 && v("b2").banned.every((nm) => nm.startsWith("T")));
+      check("⭐ 最后一人 ban 完 → 自动发手牌:进 pick 阶段,被 ban 的 8 将不在任何人手里也不在剩余池里,君主照常多主公技坑(池里只有曹丕 1 坑 → 6+1)", r4.phase === "pick" && d2.phase === "pick" && banned.every((id) => !allIds.includes(id)) && d2.hands[1].slots.length === 7 && [2, 3, 4].every((n) => d2.hands[n].slots.length === 6)
+        && v("b2").banned.length === 8 && v("b2").banned.every((nm) => nm.startsWith("T")));
       check("ban 阶段结束后 dealBan 拒绝", rm.dealBan("b1", { seatNo: 1, heroId: 100 }).error === "NOT_BAN_PHASE");
       check("ban 阶段的 deal 进 serialize/hydrate", (() => { const r2 = room(4, 3); r2.dealStart("b1", { mode: "normal", lordSeat: null, pools: mkPools(), tempBan: tb(Array.from({ length: 20 }, (_, i) => 100 + i)) }); const h = RoomCore.hydrate(JSON.parse(JSON.stringify(r2.serialize()))); return h.deal.phase === "ban" && h.deal.ban.k === 5 && h.dealBan("b1", { seatNo: 1, heroId: h.deal.ban.cands[1][0].id }).ok; })());
       const r3 = room(4, 4); r3.dealStart("b1", { mode: "normal", lordSeat: null, pools: mkPools(), tempBan: tb(Array.from({ length: 30 }, (_, i) => 100 + i)) });
@@ -1811,7 +1828,9 @@ console.log("\n=== 场景 20:线上发将 ===");
       const rm = room(2, 5);
       rm.dealStart("b1", { mode: "normal", lordSeat: null, pools: mkPools(), tempBan: tb([664, 100, 101, 102, 103, 104]) });
       const who = [1, 2].find((n) => rm.deal.ban.cands[n].some((o) => o.id === 664)), other = who === 1 ? 2 : 1;
-      rm.dealBan("b" + who, { seatNo: who, heroId: 664 }); rm.dealBan("b" + other, { seatNo: other, heroId: rm.deal.ban.cands[other][0].id });
+      const second = rm.deal.ban.cands[who].find((o) => o.id !== 664);
+      rm.dealBan("b" + who, { seatNo: who, heroId: 664 }); rm.dealBan("b" + who, { seatNo: who, heroId: second.id });
+      rm.dealBan("b" + other, { seatNo: other, heroId: rm.deal.ban.cands[other][0].id }); rm.dealBan("b" + other, { seatNo: other, heroId: rm.deal.ban.cands[other][1].id });
       const liu = [...Object.values(rm.deal.hands).flatMap((h) => h.slots), ...rm.deal.pool].find((s) => s.key === "刘备");
       check("⭐ ban 掉 SP刘备:刘备坑还在,只剩 刘备/界刘备 两版", rm.deal.phase === "pick" && liu && liu.opts.map((o) => o.id).join() === "1,299");
     }
@@ -1853,7 +1872,7 @@ console.log("\n=== 场景 20:线上发将 ===");
     check("⭐ 三人都不叫 → 最初候选(座位 3)被迫当地主,多 2 坑", r4.ok && r4.forced && r4.landlord === 3 && r3.deal.phase === "pick" && r3.deal.hands[3].slots.length === 5 && r3.deal.hands[2].slots.length === 3);
     // 临时 ban 先于叫地主
     const r5 = room(3); r5.dealStart("d1", { mode: "douzhu", lordSeat: 1, pools: pools(), tempBan: Array.from({ length: 9 }, (_, i) => ({ id: 100 + i, name: "T" + i, gid: String(100 + i) })) });
-    check("斗地主 + 临时 ban:先 ban 再叫地主", r5.deal.phase === "ban" && [1, 2, 3].every((n) => r5.dealBan("d" + n, { seatNo: n, heroId: r5.deal.ban.cands[n][0].id }).ok) && r5.deal.phase === "call" && [1, 2, 3].every((n) => r5.deal.hands[n].slots.length === 3));
+    check("斗地主 + 临时 ban:先 ban(3 人各 2 个)再叫地主", r5.deal.phase === "ban" && [1, 2, 3].every((n) => r5.dealBan("d" + n, { seatNo: n, heroId: r5.deal.ban.cands[n][0].id }).ok && r5.dealBan("d" + n, { seatNo: n, heroId: r5.deal.ban.cands[n][1].id }).ok) && r5.deal.phase === "call" && [1, 2, 3].every((n) => r5.deal.hands[n].slots.length === 3));
     check("call 阶段的 deal 进 serialize/hydrate", (() => { const h = RoomCore.hydrate(JSON.parse(JSON.stringify(r5.serialize()))); return h.deal.phase === "call" && h.dealCall("d1", { seatNo: 1, call: true }).ok && h.deal.hands[1].slots.length === 5; })());
     check("将池不够(3 人×3+2)→ POOL_TOO_SMALL", room(4).dealStart("d1", { mode: "douzhu", lordSeat: 1, pools: { normal: Array.from({ length: 10 }, (_, i) => g("将" + i, 100 + i)), lord: [], forced: null } }).error === "POOL_TOO_SMALL");
   }

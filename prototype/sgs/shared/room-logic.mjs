@@ -14,7 +14,7 @@
 // 可见性:夺到的那张 —— 吕布(gained)可见、失去方(自己 mine 的 taken)可见、其他人仅见数量。
 
 import { RoomBase, clone } from "../../common/room-base.mjs";
-import { DEAL_MODES, DEAL_HAND, DEAL_LORD_EXTRA, DEAL_TEMPBAN_MIN, DEAL_TEMPBAN_MAX, dropIdsFromPools } from "./deal.mjs"; // 线上发将:模式表/手牌数(组池纯函数也在那)
+import { DEAL_MODES, DEAL_HAND, DEAL_LORD_EXTRA, DEAL_TEMPBAN_MIN, DEAL_TEMPBAN_MAX, DEAL_TEMPBAN_SMALL, dropIdsFromPools } from "./deal.mjs"; // 线上发将:模式表/手牌数(组池纯函数也在那)
 import { applyVisibility } from "../../common/visibility.mjs";
 import { IDENT_MODES, identDefaults, identCheck, identCamp, MINGZHONG_SKILLS, mingzhongSkill, BIZHONG_HERO } from "./identity.mjs"; // 身份自动发放:模式表/默认配比/校验
 
@@ -401,6 +401,8 @@ export function initToolState(generalId) {
     return { records: { S: null, H: null, C: null, D: null }, log: [] }; // 拾昔:每花色首张单目标普通锦囊的牌名(全公开,整局有效)
   if (generalId === "mouchengyu")
     return { pending: null, choice: {}, settle: null, log: [] }; // 胆持:pending={targetSeat,sourceSeat|null,revealed};choice={}|{c}(保密,见 VISIBILITY);settle={actual,diff}(公开)
+  if (generalId === "mengda")
+    return { switches: 0, log: [] }; // 苟得·变更势力:实际势力写在 seat.chosenFaction(公开,全场面板/距离/查将都按它),这里只记次数与日志
   if (generalId === "xizhicai")
     return { target: {}, revealed: null, log: [] }; // 先辅:target={}|{seat}(保密,见 VISIBILITY);revealed=公开后的目标座位(公开)
   if (generalId === "jiachong")
@@ -566,36 +568,39 @@ export class RoomCore extends RoomBase {
     for (const n of players) this.seats[n].genLocked = false; // 重新发将 → 解锁上一局发的武将
     if (!this.ident || this.seatNos().some((n) => this.seats[n].general)) this._newGame(); // 发将=新一局(刚发完身份的那局除外,沿用同一条记录)
 
-    // 本局临时 ban(用户 2026-10-17):每人从临时 ban 池里随机看 k 个(k=min(5, floor(池/人数)),至少 3 才能开),各 ban 一个(按版本),
+    // 本局临时 ban(用户 2026-10-17):每人从临时 ban 池里随机看 k 个(k=min(5, floor(池/人数)),至少 3 才能开),各 ban n 个(人数 ≤6 → 2 个,否则 1 个;按版本),
     // 全员 ban 完再发手牌。目的是压一压高频出场的强将,而不用进黑名单永久禁。
     if (tempBan && tempBan.length) {
       const k = Math.min(DEAL_TEMPBAN_MAX, Math.floor(tempBan.length / players.length));
       if (k < DEAL_TEMPBAN_MIN) return { error: "TEMPBAN_TOO_SMALL", need: players.length * DEAL_TEMPBAN_MIN, have: tempBan.length };
       const list = tempBan.map((o) => ({ id: o.id, name: o.name, gid: o.gid })), cands = {};
       for (const n of players) { cands[n] = []; for (let i = 0; i < k; i++) cands[n].push(this._dealDraw(list)); }
+      const n = players.length <= DEAL_TEMPBAN_SMALL ? 2 : 1;
       this.deal = { phase: "ban", mode, lordSeat, firstSeats, lordTitle, lordPicked: false, hands: {}, pool: [], poolKey, poolLabel, excluded: prep.excluded,
-        ban: { k, cands, picked: {} }, prep };
+        ban: { k, n, cands, picked: {} }, prep };
       return { ok: true, players: players.length, phase: "ban" };
     }
     return this._dealHands(prep, []);
   }
-  // 临时 ban 阶段:各人 ban 一个候选;全员 ban 完 → 剔除后发手牌(进入 pick 阶段)
+  // 临时 ban 阶段:各人 ban n 个候选(picked[座位]=数组);全员 ban 够 → 剔除后发手牌(进入 pick 阶段)
   dealBan(id, { seatNo, heroId }) {
     seatNo = Number(seatNo); heroId = Number(heroId);
     const d = this.deal; if (!d) return { error: "NO_DEAL" };
     if (d.phase !== "ban") return { error: "NOT_BAN_PHASE" };
     if (!this.isHolder(id, seatNo)) return { error: "NOT_HOLDER" };
     const c = d.ban.cands[seatNo]; if (!c) return { error: "NOT_IN_DEAL" };
-    if (d.ban.picked[seatNo]) return { error: "ALREADY_BANNED" };
+    const n = d.ban.n || 1, mine = d.ban.picked[seatNo] || [];
+    if (mine.length >= n) return { error: "ALREADY_BANNED" };
     const o = c.find((x) => x.id === heroId); if (!o) return { error: "BAD_PICK" };
-    d.ban.picked[seatNo] = { heroId: o.id, name: o.name };
-    const players = d.prep.players.filter((n) => this.seats[n]); // 途中被减掉的座位不等
-    if (players.every((n) => d.ban.picked[n])) {
-      const banned = players.map((n) => d.ban.picked[n]);
+    if (mine.some((b) => b.heroId === o.id)) return { error: "ALREADY_BANNED" };
+    d.ban.picked[seatNo] = [...mine, { heroId: o.id, name: o.name }];
+    const players = d.prep.players.filter((x) => this.seats[x]); // 途中被减掉的座位不等
+    if (players.every((x) => (d.ban.picked[x] || []).length >= n)) {
+      const banned = players.flatMap((x) => d.ban.picked[x]);
       this._dealHands(d.prep, banned);
       return { ok: true, phase: "pick" };
     }
-    return { ok: true };
+    return { ok: true, left: n - d.ban.picked[seatNo].length };
   }
   // 叫地主(斗地主):当前候选决定 叫(多 2 坑,成为地主)/ 不叫(顺位给下家);转满一圈没人叫 → 最初候选必须当
   dealCall(id, { seatNo, call }) {
@@ -891,11 +896,11 @@ export class RoomCore extends RoomBase {
     const seats = {}; let picked = 0, total = 0;
     if (d.phase === "ban") { // 临时 ban 阶段:自己的候选只给自己;谁 ban 了什么全场公开
       for (const n of d.prep.players.filter((x) => this.seats[x])) {
-        total++; const p = d.ban.picked[n]; if (p) picked++;
-        seats[n] = { picked: !!p, final: false, slotCount: 0, ban: p ? { heroId: p.heroId, name: p.name } : null };
+        total++; const p = d.ban.picked[n] || [], need = d.ban.n || 1; if (p.length >= need) picked++;
+        seats[n] = { picked: p.length >= need, final: false, slotCount: 0, ban: p.length ? p.map((b) => ({ heroId: b.heroId, name: b.name })) : null, banLeft: need - p.length };
         if (holds.has(n)) seats[n].banCands = clone(d.ban.cands[n]);
       }
-      return { phase: "ban", mode: d.mode, lordSeat: d.lordSeat, firstSeats: d.firstSeats, lordTitle: d.lordTitle ?? null, lordPicked: false, seats, picked, total, banK: d.ban.k,
+      return { phase: "ban", mode: d.mode, lordSeat: d.lordSeat, firstSeats: d.firstSeats, lordTitle: d.lordTitle ?? null, lordPicked: false, seats, picked, total, banK: d.ban.k, banN: d.ban.n || 1,
         poolLeft: 0, poolKey: d.poolKey ?? null, poolLabel: d.poolLabel ?? null, banned: [], excluded: d.excluded || null };
     }
     for (const [n, hand] of Object.entries(d.hands)) {
@@ -1242,6 +1247,23 @@ export class RoomCore extends RoomBase {
 
     // ───────── 贾充:凶竖(秘密猜测)。发动=展示目标一张手牌(公开)+ 秘密猜"此阶段是否使用同名牌";
     // 猜测锁定不可改、仅贾充可见(VISIBILITY.guess=ownerSeatOnly);阶段结束点揭晓→公开猜测+实际+对错 ─────────
+    // ───────── 孟达:苟得「变更势力」。在 app 里切换当前势力(seat.chosenFaction;null=回本势力蜀),全公开 ─────────
+    if (target.general === "mengda") {
+      const mSeat = targetSeat, isMd = bySeat === mSeat && iHold(mSeat);
+      if (t === "mdFaction") { // {faction: 魏|蜀|吴|群|晋|null}
+        if (!isMd) return { error: "NOT_MD_ACTION" };
+        const f = toolAction.faction == null || toolAction.faction === "" ? null : String(toolAction.faction);
+        if (f != null && !["魏", "蜀", "吴", "群", "晋"].includes(f)) return { error: "BAD_FACTION" };
+        const prev = target.chosenFaction || "蜀";
+        target.chosenFaction = f;
+        ts.switches = (ts.switches || 0) + 1;
+        this._log(ts, `苟得:势力 ${prev} → ${f || "蜀(本势力)"}`);
+        return { ok: true, faction: f };
+      }
+      if (t === "resetGame") { if (!isMd) return { error: "NOT_MD_ACTION" }; target.chosenFaction = null; target.toolState = initToolState(target.general); return { ok: true, reset: true }; }
+      return { error: "UNKNOWN_ACTION" };
+    }
+
     // ───────── 戏志才:先辅(秘密目标)。游戏开始时秘密选一名其他角色,锁定不可改;目标受伤后戏志才点「公开」全场可见。log 措辞不泄露目标 ─────────
     if (target.general === "xizhicai") {
       const xSeat = targetSeat;
