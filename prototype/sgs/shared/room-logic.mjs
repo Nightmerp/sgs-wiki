@@ -14,7 +14,7 @@
 // 可见性:夺到的那张 —— 吕布(gained)可见、失去方(自己 mine 的 taken)可见、其他人仅见数量。
 
 import { RoomBase, clone } from "../../common/room-base.mjs";
-import { DEAL_MODES, DEAL_HAND, DEAL_LORD_EXTRA } from "./deal.mjs"; // 线上发将:模式表/手牌数(组池纯函数也在那)
+import { DEAL_MODES, DEAL_HAND, DEAL_LORD_EXTRA, DEAL_TEMPBAN_MIN, DEAL_TEMPBAN_MAX, dropIdsFromPools } from "./deal.mjs"; // 线上发将:模式表/手牌数(组池纯函数也在那)
 import { applyVisibility } from "../../common/visibility.mjs";
 import { IDENT_MODES, identDefaults, identCheck, identCamp, MINGZHONG_SKILLS, mingzhongSkill, BIZHONG_HERO } from "./identity.mjs"; // 身份自动发放:模式表/默认配比/校验
 
@@ -506,7 +506,8 @@ export class RoomCore extends RoomBase {
     if (!idx.length) return null;
     return list.splice(idx[Math.floor(this.rng() * idx.length)], 1)[0];
   }
-  dealStart(id, { mode = "normal", lordSeat = null, pools, poolKey = null, poolLabel = null }) {
+  // tempBan = 可供「本局临时 ban」的候选 [{id,name,gid}](worker 已与将池取交集;null=不开);excluded = 「排除今日已登场」剔掉的武将名(仅展示)
+  dealStart(id, { mode = "normal", lordSeat = null, pools, poolKey = null, poolLabel = null, tempBan = null, excluded = null }) {
     if (!this.devices[id]) return { error: "NO_DEVICE" };
     if (this.deal) return { error: "DEAL_ACTIVE" };
     if (!DEAL_MODES[mode]) return { error: "BAD_MODE" };
@@ -529,16 +530,58 @@ export class RoomCore extends RoomBase {
       }
     }
     if (lordSeat != null && !players.includes(lordSeat)) return { error: "BAD_LORD" };
+    if (!firstSeats) firstSeats = lordSeat != null ? [lordSeat] : [];
+    const prep = { mode, lordSeat, lordExtra, lordTitle, firstSeats, players, poolKey, poolLabel, excluded: excluded || null,
+      pools: { normal: pools?.normal || [], lord: pools?.lord || [], forced: pools?.forced || null } };
+    if ((prep.pools.normal.length) < players.length * DEAL_HAND) return { error: "POOL_TOO_SMALL", need: players.length * DEAL_HAND, have: prep.pools.normal.length };
+    for (const n of players) this.seats[n].genLocked = false; // 重新发将 → 解锁上一局发的武将
+    if (!this.ident || this.seatNos().some((n) => this.seats[n].general)) this._newGame(); // 发将=新一局(刚发完身份的那局除外,沿用同一条记录)
 
-    const normal = (pools?.normal || []).map((g) => ({ key: g.key, opts: g.opts }));
-    const lordPool = (pools?.lord || []).map((g) => ({ key: g.key, opts: g.opts }));
+    // 本局临时 ban(用户 2026-10-17):每人从临时 ban 池里随机看 k 个(k=min(5, floor(池/人数)),至少 3 才能开),各 ban 一个(按版本),
+    // 全员 ban 完再发手牌。目的是压一压高频出场的强将,而不用进黑名单永久禁。
+    if (tempBan && tempBan.length) {
+      const k = Math.min(DEAL_TEMPBAN_MAX, Math.floor(tempBan.length / players.length));
+      if (k < DEAL_TEMPBAN_MIN) return { error: "TEMPBAN_TOO_SMALL", need: players.length * DEAL_TEMPBAN_MIN, have: tempBan.length };
+      const list = tempBan.map((o) => ({ id: o.id, name: o.name, gid: o.gid })), cands = {};
+      for (const n of players) { cands[n] = []; for (let i = 0; i < k; i++) cands[n].push(this._dealDraw(list)); }
+      this.deal = { phase: "ban", mode, lordSeat, firstSeats, lordTitle, lordPicked: false, hands: {}, pool: [], poolKey, poolLabel, excluded: prep.excluded,
+        ban: { k, cands, picked: {} }, prep };
+      return { ok: true, players: players.length, phase: "ban" };
+    }
+    return this._dealHands(prep, []);
+  }
+  // 临时 ban 阶段:各人 ban 一个候选;全员 ban 完 → 剔除后发手牌(进入 pick 阶段)
+  dealBan(id, { seatNo, heroId }) {
+    seatNo = Number(seatNo); heroId = Number(heroId);
+    const d = this.deal; if (!d) return { error: "NO_DEAL" };
+    if (d.phase !== "ban") return { error: "NOT_BAN_PHASE" };
+    if (!this.isHolder(id, seatNo)) return { error: "NOT_HOLDER" };
+    const c = d.ban.cands[seatNo]; if (!c) return { error: "NOT_IN_DEAL" };
+    if (d.ban.picked[seatNo]) return { error: "ALREADY_BANNED" };
+    const o = c.find((x) => x.id === heroId); if (!o) return { error: "BAD_PICK" };
+    d.ban.picked[seatNo] = { heroId: o.id, name: o.name };
+    const players = d.prep.players.filter((n) => this.seats[n]); // 途中被减掉的座位不等
+    if (players.every((n) => d.ban.picked[n])) {
+      const banned = players.map((n) => d.ban.picked[n]);
+      this._dealHands(d.prep, banned);
+      return { ok: true, phase: "pick" };
+    }
+    return { ok: true };
+  }
+  // 真正发手牌(prep=dealStart 算好的参数;banned=临时 ban 掉的 [{heroId,name}],按版本剔除)
+  _dealHands(prep, banned) {
+    const { mode, lordSeat, lordExtra, lordTitle, firstSeats, poolKey, poolLabel, excluded } = prep;
+    const players = prep.players.filter((n) => this.seats[n]);
+    const pools = dropIdsFromPools(prep.pools, banned.map((b) => b.heroId));
+    const normal = pools.normal.map((g) => ({ key: g.key, opts: g.opts }));
+    const lordPool = pools.lord.map((g) => ({ key: g.key, opts: g.opts }));
     const hands = {};
-    for (const n of players) { hands[n] = { slots: [], initKeys: [], pick: null }; this.seats[n].genLocked = false; } // 重新发将 → 解锁上一局发的武将
+    for (const n of players) hands[n] = { slots: [], initKeys: [], pick: null };
 
     // 1) 君主额外候选:模式专属君主必出,其余从主公技坑里抽满;抽中的坑从普通池剔除(全场一坑一人)
     if (lordSeat != null && lordExtra) {
       const extras = [];
-      if (pools?.forced) extras.push({ key: pools.forced.key, opts: pools.forced.opts });
+      if (pools.forced) extras.push({ key: pools.forced.key, opts: pools.forced.opts });
       while (extras.length < DEAL_LORD_EXTRA) { const g = this._dealDraw(lordPool); if (!g) break; extras.push(g); }
       const taken = new Set(extras.map((g) => g.key));
       for (let i = normal.length - 1; i >= 0; i--) if (taken.has(normal[i].key)) normal.splice(i, 1);
@@ -553,16 +596,16 @@ export class RoomCore extends RoomBase {
         hands[n].initKeys.push(g.key);
       }
     }
-    if (!firstSeats) firstSeats = lordSeat != null ? [lordSeat] : [];
-    if (!this.ident || this.seatNos().some((n) => this.seats[n].general)) this._newGame(); // 发将=新一局(刚发完身份的那局除外,沿用同一条记录)
     // lordSeat=拿主公技候选的君主座位(明忠模式=明忠座位,无额外候选);firstSeats=先选先亮的座位(君主 / 明忠 / 无间道两主帅),lordTitle=其称谓
-    this.deal = { mode, lordSeat, firstSeats, lordTitle, lordPicked: false, hands, pool: normal, poolKey, poolLabel }; // poolKey/Label:用的是哪个环境的名单(仅展示)
+    // banned=本局临时 ban 掉的(公开);excluded=按「今日已登场」剔掉的武将名(公开,仅展示)
+    this.deal = { phase: "pick", mode, lordSeat, firstSeats, lordTitle, lordPicked: false, hands, pool: normal, poolKey, poolLabel, banned, excluded }; // poolKey/Label:用的是哪个环境的名单(仅展示)
     return { ok: true, players: players.length };
   }
   // 换将:起手坑各可换一次 —— 原坑放回将池,重抽一个不与自己起手 6 坑重复的;换来的坑不可再换
   dealSwap(id, { seatNo, slot }) {
     seatNo = Number(seatNo); slot = Number(slot);
     if (!this.deal) return { error: "NO_DEAL" };
+    if (this.deal.phase === "ban") return { error: "BAN_PHASE" };
     if (!this.isHolder(id, seatNo)) return { error: "NOT_HOLDER" };
     const hand = this.deal.hands[seatNo]; if (!hand) return { error: "NOT_IN_DEAL" };
     if (hand.pick && hand.pick.final) return { error: "ALREADY_PICKED" };
@@ -579,6 +622,7 @@ export class RoomCore extends RoomBase {
   dealPick(id, { seatNo, slot, heroId }) {
     seatNo = Number(seatNo); slot = Number(slot); heroId = Number(heroId);
     const d = this.deal; if (!d) return { error: "NO_DEAL" };
+    if (d.phase === "ban") return { error: "BAN_PHASE" };
     if (!this.isHolder(id, seatNo)) return { error: "NOT_HOLDER" };
     const hand = d.hands[seatNo]; if (!hand) return { error: "NOT_IN_DEAL" };
     if (hand.pick && hand.pick.final) return { error: "ALREADY_PICKED" };
@@ -598,6 +642,7 @@ export class RoomCore extends RoomBase {
   // 亮出:全员选定后任何人可点 → 所有人落座,发将结束
   dealReveal(id) {
     const d = this.deal; if (!d) return { error: "NO_DEAL" };
+    if (d.phase === "ban") return { error: "BAN_PHASE" };
     if (!this.devices[id]) return { error: "NO_DEVICE" };
     const seats = Object.keys(d.hands).map(Number).filter((n) => this.seats[n]); // 发将途中被减掉的座位跳过
     if (seats.some((n) => !d.hands[n].pick)) return { error: "NOT_ALL_PICKED" };
@@ -783,6 +828,15 @@ export class RoomCore extends RoomBase {
   _dealView(holds) {
     const d = this.deal; if (!d) return null;
     const seats = {}; let picked = 0, total = 0;
+    if (d.phase === "ban") { // 临时 ban 阶段:自己的候选只给自己;谁 ban 了什么全场公开
+      for (const n of d.prep.players.filter((x) => this.seats[x])) {
+        total++; const p = d.ban.picked[n]; if (p) picked++;
+        seats[n] = { picked: !!p, final: false, slotCount: 0, ban: p ? { heroId: p.heroId, name: p.name } : null };
+        if (holds.has(n)) seats[n].banCands = clone(d.ban.cands[n]);
+      }
+      return { phase: "ban", mode: d.mode, lordSeat: d.lordSeat, firstSeats: d.firstSeats, lordTitle: d.lordTitle ?? null, lordPicked: false, seats, picked, total, banK: d.ban.k,
+        poolLeft: 0, poolKey: d.poolKey ?? null, poolLabel: d.poolLabel ?? null, banned: [], excluded: d.excluded || null };
+    }
     for (const [n, hand] of Object.entries(d.hands)) {
       if (!this.seats[n]) continue;
       total++; if (hand.pick) picked++;
@@ -791,7 +845,8 @@ export class RoomCore extends RoomBase {
       if (mine) { seats[n].slots = clone(hand.slots); seats[n].pick = hand.pick ? clone(hand.pick) : null; }
       else if (hand.pick && hand.pick.final) seats[n].pick = { heroId: hand.pick.heroId, name: hand.pick.name, final: true }; // 君主已亮出
     }
-    return { mode: d.mode, lordSeat: d.lordSeat, firstSeats: d.firstSeats ?? (d.lordSeat != null ? [d.lordSeat] : []), lordTitle: d.lordTitle ?? null, lordPicked: d.lordPicked, seats, picked, total, poolLeft: d.pool.length, poolKey: d.poolKey ?? null, poolLabel: d.poolLabel ?? null };
+    return { phase: "pick", mode: d.mode, lordSeat: d.lordSeat, firstSeats: d.firstSeats ?? (d.lordSeat != null ? [d.lordSeat] : []), lordTitle: d.lordTitle ?? null, lordPicked: d.lordPicked, seats, picked, total, poolLeft: d.pool.length, poolKey: d.poolKey ?? null, poolLabel: d.poolLabel ?? null,
+      banned: (d.banned || []).map((b) => b.name), excluded: d.excluded || null };
   }
 
   // 立绘皮肤(公开:手机当武将牌用,全场看到的是同一张;只有持有者能换。skinId=OL 皮肤 id,null=默认立绘;合法性由客户端按 hero-skins.json 保证,服务端只收整数)

@@ -578,7 +578,8 @@ const RC=RoomClient.create({
   errorText: {BANNED:"该武将在禁将池,不能落座",
     DEAL_ACTIVE:"已有发将在进行中",POOL_NOT_SET:"将池白名单还没设置(房间设置 → 将池编辑)",POOL_TOO_SMALL:"将池不够发:可发的坑数少于 人数×6",POOL_UNAVAILABLE:"读取将池失败,稍后再试",
     BAD_LORD:"君主座位必须是已入座的座位",NO_PLAYERS:"还没有人入座",LORD_FIRST:"等君主先选定并亮出",ALREADY_PICKED:"已选定并亮出,不能再改",CANT_SWAP:"这个坑不能换(已换过,或是君主候选)",
-    POOL_EMPTY:"将池里没有可换的了",NOT_ALL_PICKED:"还有人没选定",NOT_IN_DEAL:"该座位不在本次发将里",BAD_PICK:"候选已变化,请重新选择",NO_DEAL:"发将已结束",
+    POOL_EMPTY:"将池里没有可换的了",TEMPBAN_TOO_SMALL:"临时 ban 池太小:每人至少要 3 选 1(将池编辑 → 临时 ban 池 多勾一些)",TEMPBAN_EMPTY:"临时 ban 池里没有在本局将池里的武将(将池编辑 → 临时 ban 池)",
+    BAN_PHASE:"还在临时 ban 阶段,等全员 ban 完再选将",NOT_BAN_PHASE:"不在临时 ban 阶段",ALREADY_BANNED:"你已经 ban 过了",NOT_ALL_PICKED:"还有人没选定",NOT_IN_DEAL:"该座位不在本次发将里",BAD_PICK:"候选已变化,请重新选择",NO_DEAL:"发将已结束",
     GENERAL_LOCKED:"线上发将选定的武将不能再改(要重来请重新发将,或在房间设置里点「新一局」)",
     COUNT_MISMATCH:"身份张数之和要等于入座人数",BAD_LEAD:"君主身份必须正好 1 张(明忠模式还要至少 1 名忠臣)",BAD_COUNTS:"身份张数填得不对",BAD_LOST:"失心张数不对",
     NO_DEFAULT:"这个人数没有默认配比,请在发身份设置里手填",NO_IDENT:"本局没有发身份",ALREADY_PEEKED:"明察整局只能看一次",NO_SKILL:"当前武将没有这个技能(或已经用完)",NO_GENERAL:"先选定武将",BAD_SKIN:"皮肤编号不对",ALREADY_USED:"蔽众整局只能发动一次",BAD_TARGET:"不能选这个座位"},
@@ -641,11 +642,15 @@ function viewDealRow(){
   const d=state.deal;
   if(!d) return `<div class="row" style="margin-bottom:8px">`+(state.ident?"":`<button class="gold grow" data-identopen="1">🪪 发身份</button>`)
     +`<button class="gold grow" data-dealopen="1">🎴 线上发将${state.ident?"(代替手抽武将)":""}</button></div>`;
-  const mu=DEAL_MODE_UI[d.mode]||DEAL_MODE_UI.normal, all=d.picked===d.total;
-  let h=`<div class="row" style="margin-bottom:8px"><span class="grow" style="font-size:13px">🎴 <b>发将中</b> · ${mu[0]}${d.poolLabel?" · "+esc(d.poolLabel):""} · 已选 <b>${d.picked}/${d.total}</b></span>`;
-  if(all) h+=`<button class="primary" data-dealreveal="1">亮出</button>`;
+  const mu=DEAL_MODE_UI[d.mode]||DEAL_MODE_UI.normal, all=d.picked===d.total, banPhase=d.phase==="ban";
+  let h=`<div class="row" style="margin-bottom:8px"><span class="grow" style="font-size:13px">🎴 <b>${banPhase?"临时 ban 中":"发将中"}</b> · ${mu[0]}${d.poolLabel?" · "+esc(d.poolLabel):""} · ${banPhase?"已 ban":"已选"} <b>${d.picked}/${d.total}</b></span>`;
+  if(all&&!banPhase) h+=`<button class="primary" data-dealreveal="1">亮出</button>`;
   h+=`<button class="ghost" data-dealcancel="1" style="font-size:12px">中止</button></div>`;
-  if(dealFirsts().length&&!d.lordPicked) h+=`<div class="hint" style="margin:-2px 0 8px">等${dealLordTitle()}(座位${dealFirsts().join("、")})先选定并${dealFirsts().length>1?"一起":""}亮出,其余人可以先看牌、换将。</div>`;
+  if(banPhase) h+=`<div class="hint" style="margin:-2px 0 8px">每人从临时 ban 池里看 ${d.banK} 个,各 ban 一个;全员 ban 完自动发将。</div>`;
+  const extra=[...(d.banned||[]).map(n=>"ban "+n), ...(d.excluded&&d.excluded.length?["今日已登场剔除 "+d.excluded.length+" 将"]:[])];
+  if(!banPhase&&extra.length) h+=`<div class="hint" style="margin:-2px 0 8px">本局剔除:${esc(extra.join(" · "))}</div>`;
+  if(banPhase){}
+  else if(dealFirsts().length&&!d.lordPicked) h+=`<div class="hint" style="margin:-2px 0 8px">等${dealLordTitle()}(座位${dealFirsts().join("、")})先选定并${dealFirsts().length>1?"一起":""}亮出,其余人可以先看牌、换将。</div>`;
   else if(all) h+=`<div class="hint" style="margin:-2px 0 8px">全员已选定,任何人点「亮出」即全部落座。</div>`;
   return h;
 }
@@ -661,9 +666,12 @@ function openDealSetup(){
       +Object.entries(BAN_POOLS).map(([k,p])=>`<option value="${esc(k)}">${esc(p.label||k)}</option>`).join("")+`</select></div>
     <div class="row" style="margin-bottom:12px"><label style="flex:none;width:64px">君主座位</label><select id="deal-lord" class="grow"><option value="">无君主(不发主公技候选)</option>`
       +held.map(s=>`<option value="${s.seatNo}">座位${s.seatNo} · ${esc(s.holderDevices[0])}</option>`).join("")+`</select></div>
+    <div style="margin:-4px 0 8px;font-size:13px"><label><input type="checkbox" id="deal-tempban" style="width:auto"> 本局临时 ban:每人从「临时 ban 池」随机看 3~5 个,各 ban 一个(按版本),本局不出现</label></div>
+    <div style="margin:0 0 12px;font-size:13px"><label><input type="checkbox" id="deal-today" style="width:auto"> 排除今天已登场的武将(按历史对局,北京时间当天;只剔那个版本)</label></div>
     <div class="row"><button class="primary grow" id="deal-go"${held.length?"":" disabled"}>开始发将</button></div>
     ${held.length?"":'<div class="hint">还没有人入座,先认领座位。</div>'}</div></div>`;
   maskClose();
+  try{ $("#deal-tempban").checked=localStorage.getItem("sgs_dealTempBan")==="1"; $("#deal-today").checked=localStorage.getItem("sgs_dealToday")==="1"; }catch(e){} // 开关记本机
   { // 本局发过身份 → 模式与君主座位直接带过来(君主=1 号位;明忠/无间道没有先选的君主)
     const im=state.ident&&state.ident.mode, dm={normal:"normal",baonue:"baonue",shixin:"shixin",dazhong:"dazhong"}[im];
     if(dm){ $("#deal-mode").value=dm; if(held.some(s=>s.seatNo===1)) $("#deal-lord").value="1"; }
@@ -674,12 +682,15 @@ function openDealSetup(){
         +(fs.length>1?`两名主帅(座位${fs.join("、")})先各自暗选、都选定后一起亮出,其余人再暗选、一起亮出。`:fs.length?`${esc(state.ident.seats[fs[0]].pub)}(座位${fs[0]})先选定并亮出,其余人再暗选、一起亮出。`:"所有人一起暗选亮出。")+`</div>`);
     }
   }
-  $("#deal-go").onclick=()=>{const lord=$("#deal-lord").value;send({type:"dealStart",mode:$("#deal-mode").value,pool:$("#deal-pool").value||null,lordSeat:lord===""?null:+lord});closeModal();};
+  $("#deal-go").onclick=()=>{const lord=$("#deal-lord").value, tb=$("#deal-tempban").checked, td=$("#deal-today").checked;
+    try{ localStorage.setItem("sgs_dealTempBan",tb?"1":"0"); localStorage.setItem("sgs_dealToday",td?"1":"0"); }catch(e){}
+    send({type:"dealStart",mode:$("#deal-mode").value,pool:$("#deal-pool").value||null,lordSeat:lord===""?null:+lord,tempBan:tb,excludeToday:td});closeModal();};
 }
 function openDeal(sn){ dealSeat=sn; dealOpen=null; renderDeal(); }
 function renderDeal(){
   if(dealSeat==null) return;
   const d=state&&state.deal, me=d&&d.seats[dealSeat];
+  if(d&&d.phase==="ban"){ renderDealBan(d,me); return; }
   if(!d||!me||!me.slots){ closeModal(); return; } // 发将结束 / 座位已不归我 → 关弹层
   const firsts=dealFirsts(), isLord=firsts.includes(dealSeat), lt=dealLordTitle(), multi=firsts.length>1;
   const waitLord=firsts.length>0&&!isLord&&!d.lordPicked, locked=!!(me.pick&&me.pick.final);
@@ -972,6 +983,34 @@ function bindWiki(){
   renderWikiGrid();
 }
 
+// 临时 ban 阶段的弹层:看自己的候选、展开技能、ban 一个;ban 完等别人
+function renderDealBan(d,me){
+  if(!me||!me.banCands){ closeModal(); return; }
+  const sc=$("#modal .sheet"), keep=sc?sc.scrollTop:0;
+  let h=`<div class="mask" data-mclose="1"><div class="sheet" style="max-height:92vh;overflow:auto">
+    <h2>临时 ban · 座位 ${dealSeat}<span class="x" data-mclose="1">×</span></h2>
+    <div style="margin-bottom:10px">${me.ban?`你 ban 了:<b style="color:var(--seal)">${esc(me.ban.name)}</b> <span class="hint" style="margin:0">(等其他人 ban 完自动发将,已 ban ${d.picked}/${d.total})</span>`:`从下面 ${me.banCands.length} 个里<b>ban 掉一个</b>,本局不会发出(只 ban 这个版本,同名其它版本照常)。`}</div>
+    <div class="dslot">`;
+  for(const o of me.banCands){
+    const hero=HERO_BY_ID.get(o.id), open=dealOpen===o.id, isB=me.ban&&me.ban.heroId===o.id;
+    const fc=hero?(hero.factionSelectable?"shen":(FCLS[hero.faction]||"")):"";
+    h+=`<div class="dopt${isB?" picked":""}"><img class="dava" src="${esc(hero&&hero.avatar||"")}" onerror="this.style.visibility='hidden'"/>`
+      +`<span class="grow"><b>${esc(o.name)}</b>${hero?`<span class="fc ${fc}">${esc(hero.factionSelectable?"神":hero.faction||"?")}</span> <span style="font-size:12px;color:var(--ink-soft)">${hero.hp||"?"}血</span>`:""}</span>`
+      +`<button class="gold btn-skill" data-dskill="${o.id}">${open?"收起":"技能"}</button>`
+      +(me.ban?(isB?`<span class="lb">已 ban</span>`:""):`<button data-dban="${o.id}" data-dname="${esc(o.name)}" style="padding:5px 12px;border-color:var(--seal);color:var(--seal)">ban</button>`)+`</div>`;
+    if(open&&hero) h+=`<div class="dskills">${hero.characteristic?`<div class="hint" style="margin:0 0 6px">特点:${esc(hero.characteristic)}</div>`:""}${cardWarnHtml(hero)}${skillsHtml(hero.skills)}${derivedSkillsHtml(hero)}${derivedCardsHtml(hero)}</div>`;
+  }
+  h+=`</div>`;
+  const others=Object.entries(d.seats).filter(([n,s])=>s.ban).map(([n,s])=>`座位${n} ban ${s.ban.name}`);
+  if(others.length) h+=`<div class="hint" style="margin-top:8px">已 ban:${esc(others.join(" · "))}</div>`;
+  h+=`</div></div>`;
+  $("#modal").innerHTML=h;
+  const ns=$("#modal .sheet"); if(ns) ns.scrollTop=keep;
+  document.querySelectorAll("#modal [data-mclose]").forEach(b=>b.onclick=e=>{if(e.target===b){closeModal();}});
+  const mq=s=>document.querySelectorAll("#modal "+s);
+  mq("[data-dskill]").forEach(b=>b.onclick=()=>{const id=+b.dataset.dskill;dealOpen=dealOpen===id?null:id;renderDeal();});
+  mq("[data-dban]").forEach(b=>b.onclick=()=>{if(confirm("本局 ban 掉「"+b.dataset.dname+"」?不能改。"))send({type:"dealBan",seatNo:dealSeat,heroId:+b.dataset.dban});});
+}
 // 规则集:身份模式规则/房规 目录卡(只列标题;点开弹层 iframe 加载 /rules/{id}.html 整页)。目录为空则不显示
 function viewRulesIndex(){
   if(!RULES.length) return "";
@@ -1092,7 +1131,8 @@ function viewSeats(){
     }
     if(ds){
       if(dealFirsts().includes(s.seatNo)&&!(iv&&iv.pub)) label=`<span class="lb">${dealLordTitle()}</span>`+label;
-      if(!ds.final) label+=ds.picked?`<span class="kb">✓ 已选</span>`:`<span class="kb" style="opacity:.65">… 未选</span>`;
+      if(deal.phase==="ban") label+=ds.ban?`<span class="kb">⌛ ban ${esc(ds.ban.name)}</span>`:`<span class="kb" style="opacity:.65">… 待 ban</span>`;
+      else if(!ds.final) label+=ds.picked?`<span class="kb">✓ 已选</span>`:`<span class="kb" style="opacity:.65">… 未选</span>`;
     }
     h+=`<div class="seat ${mine?'mine':''}"><div class="row">`+(hero?`<img class="sava" data-art="${s.seatNo}" src="${esc(seatThumb(s,hero))}" alt="立绘" title="看立绘" onerror="this.style.visibility='hidden'"/>`:"")+`<span class="st grow">座位 ${s.seatNo}`
       +label+(mine?'<span class="lb" style="color:#2b6cb0;border-color:#2b6cb0">我</span>':"")+`</span>`;
@@ -1109,7 +1149,8 @@ function viewSeats(){
       // 发将中的参与座位:手动选武将入口换成发将弹层入口(防误点);已亮出(君主)则不再给入口
       // 线上发将亮出的武将锁定(genLocked):不再给手动改的入口;手动选将的座位保留下拉
       let ctl="";
-      if(ds){ if(!ds.final) ctl+=`<label style="font-size:12px;color:var(--ink-soft)">发将</label><button class="${ds.picked?"":"primary"}" data-dealseat="${s.seatNo}" style="font-size:13px">${ds.picked?"已暗选 · 可改":"选将 →"}</button>`; }
+      if(ds){ if(deal.phase==="ban") ctl+=`<label style="font-size:12px;color:var(--ink-soft)">临时 ban</label><button class="${ds.ban?"":"primary"}" data-dealseat="${s.seatNo}" style="font-size:13px">${ds.ban?"已 ban · 看候选":"去 ban 一个 →"}</button>`;
+        else if(!ds.final) ctl+=`<label style="font-size:12px;color:var(--ink-soft)">发将</label><button class="${ds.picked?"":"primary"}" data-dealseat="${s.seatNo}" style="font-size:13px">${ds.picked?"已暗选 · 可改":"选将 →"}</button>`; }
       else if(!s.genLocked) ctl+=`<label style="font-size:12px;color:var(--ink-soft)">武将</label><button data-pick="${s.seatNo}" style="font-size:13px">${has?esc(nm)+" ▾":"选武将 ▾"}</button>`;
       if(iv&&iv.mine) ctl+=`<button class="gold" data-myident="${s.seatNo}" style="font-size:13px">🪪 我的身份</button>`;
       if(ctl) h+=`<div class="row" style="margin-top:6px">${ctl}</div>`;

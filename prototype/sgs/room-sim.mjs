@@ -1719,6 +1719,64 @@ console.log("\n=== 场景 20:线上发将 ===");
     check("⭐ 蔽众 8 人×30 种子:仅教主张角可发动、目标变失心且自己看不到、教主可任意交换失心身份(多次)、完成后关闭、别人看不到", ok === runs);
     setHeroInfo({});
   }
+  // ───────── 本局临时 ban(用户 2026-10-17)+ 排除今日已登场 ─────────
+  {
+    const { dropIdsFromPools, DEAL_TEMPBAN_MIN, DEAL_TEMPBAN_MAX } = await import("./shared/deal.mjs");
+    const mk = (seed) => { let x = seed * 7919; return () => (x = (x * 1103515245 + 12345) % 2147483648) / 2147483648; };
+    const g = (k, ids, lord = false) => ({ key: k, opts: ids.map((id) => ({ id, name: k + (ids.length > 1 ? id : ""), gid: String(id), lord })) });
+    const mkPools = () => ({ normal: [g("刘备", [1, 299, 664]), ...Array.from({ length: 50 }, (_, i) => g("将" + i, [100 + i]))], lord: [g("曹丕", [43], true)], forced: null });
+    // dropIdsFromPools:按版本剔除;整坑空了才删;forced 被剔 → null
+    {
+      const p = dropIdsFromPools({ normal: [g("刘备", [1, 299, 664]), g("关羽", [2])], lord: [g("曹丕", [43], true)], forced: g("教主张角", [9019]) }, [664, 2, 9019]);
+      check("dropIdsFromPools:SP刘备(664)被剔,刘备/界刘备仍在;关羽整坑删;专属君主被剔 → forced null", p.normal.length === 1 && p.normal[0].opts.map((o) => o.id).join() === "1,299" && p.lord.length === 1 && p.forced === null);
+    }
+    const room = (n, seed) => { const rm = new RoomCore("t", n, mk(seed)); for (let i = 1; i <= n; i++) rm.claimSeat("b" + i, i); return rm; };
+    const tb = (ids) => ids.map((id) => ({ id, name: "T" + id, gid: String(id) }));
+    // 池太小不能开
+    {
+      const rm = room(4, 1);
+      check("临时 ban 池 < 人数×3 → TEMPBAN_TOO_SMALL,发将没开始", rm.dealStart("b1", { mode: "normal", lordSeat: null, pools: mkPools(), tempBan: tb([100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110]) }).error === "TEMPBAN_TOO_SMALL" && rm.deal === null);
+    }
+    // 4 人 × 12 候选 → 每人 3 个;20 候选 → 每人 5;30 → 仍 5
+    {
+      const rm = room(4, 2);
+      const r = rm.dealStart("b1", { mode: "normal", lordSeat: 1, pools: mkPools(), tempBan: tb(Array.from({ length: 12 }, (_, i) => 100 + i)) });
+      const d = rm.deal, v = (dev) => rm.viewFor(dev).deal;
+      check("⭐ 开临时 ban:进入 ban 阶段,每人 3 个候选、互不重复", r.ok && r.phase === "ban" && d.phase === "ban" && d.ban.k === 3 && [1, 2, 3, 4].every((n) => d.ban.cands[n].length === 3)
+        && new Set([1, 2, 3, 4].flatMap((n) => d.ban.cands[n].map((o) => o.id))).size === 12);
+      check("候选只给本人;别人只见 ban 没 ban", v("b1").seats[1].banCands.length === 3 && v("b2").seats[1].banCands === undefined && v("b2").phase === "ban" && v("b2").total === 4 && v("b2").banK === 3);
+      check("ban 阶段不能选将/换将/亮出", rm.dealPick("b1", { seatNo: 1, slot: 0, heroId: 100 }).error === "BAN_PHASE" && rm.dealSwap("b1", { seatNo: 1, slot: 0 }).error === "BAN_PHASE" && rm.dealReveal("b1").error === "BAN_PHASE");
+      check("只能 ban 自己候选里的;别人不能替你 ban", rm.dealBan("b1", { seatNo: 1, heroId: d.ban.cands[2][0].id }).error === "BAD_PICK" && rm.dealBan("b2", { seatNo: 1, heroId: d.ban.cands[1][0].id }).error === "NOT_HOLDER");
+      const pick = (n) => rm.dealBan("b" + n, { seatNo: n, heroId: d.ban.cands[n][0].id });
+      const banned = [1, 2, 3, 4].map((n) => d.ban.cands[n][0].id);
+      check("前三人 ban:仍在 ban 阶段,ban 结果公开,不能改", pick(1).ok && pick(2).ok && pick(3).ok && rm.deal.phase === "ban" && v("b4").seats[1].ban.heroId === banned[0] && v("b4").picked === 3 && rm.dealBan("b1", { seatNo: 1, heroId: d.ban.cands[1][1].id }).error === "ALREADY_BANNED");
+      const r4 = pick(4);
+      const d2 = rm.deal;
+      const allIds = Object.values(d2.hands).flatMap((h) => h.slots.flatMap((s) => s.opts.map((o) => o.id))).concat(d2.pool.flatMap((g) => g.opts.map((o) => o.id)));
+      check("⭐ 最后一人 ban 完 → 自动发手牌:进 pick 阶段,被 ban 的 4 将不在任何人手里也不在剩余池里,君主照常多主公技坑(池里只有曹丕 1 坑 → 6+1)", r4.phase === "pick" && d2.phase === "pick" && banned.every((id) => !allIds.includes(id)) && d2.hands[1].slots.length === 7 && [2, 3, 4].every((n) => d2.hands[n].slots.length === 6)
+        && v("b2").banned.length === 4 && v("b2").banned.every((nm) => nm.startsWith("T")));
+      check("ban 阶段结束后 dealBan 拒绝", rm.dealBan("b1", { seatNo: 1, heroId: 100 }).error === "NOT_BAN_PHASE");
+      check("ban 阶段的 deal 进 serialize/hydrate", (() => { const r2 = room(4, 3); r2.dealStart("b1", { mode: "normal", lordSeat: null, pools: mkPools(), tempBan: tb(Array.from({ length: 20 }, (_, i) => 100 + i)) }); const h = RoomCore.hydrate(JSON.parse(JSON.stringify(r2.serialize()))); return h.deal.phase === "ban" && h.deal.ban.k === 5 && h.dealBan("b1", { seatNo: 1, heroId: h.deal.ban.cands[1][0].id }).ok; })());
+      const r3 = room(4, 4); r3.dealStart("b1", { mode: "normal", lordSeat: null, pools: mkPools(), tempBan: tb(Array.from({ length: 30 }, (_, i) => 100 + i)) });
+      check("候选数封顶 5", r3.deal.ban.k === DEAL_TEMPBAN_MAX && DEAL_TEMPBAN_MIN === 3);
+      check("ban 阶段可中止", r3.dealCancel("b1").ok && r3.deal === null);
+    }
+    // 同名版本:ban 掉 SP刘备(664)后 刘备/界刘备 仍可发出
+    {
+      const rm = room(2, 5);
+      rm.dealStart("b1", { mode: "normal", lordSeat: null, pools: mkPools(), tempBan: tb([664, 100, 101, 102, 103, 104]) });
+      const who = [1, 2].find((n) => rm.deal.ban.cands[n].some((o) => o.id === 664)), other = who === 1 ? 2 : 1;
+      rm.dealBan("b" + who, { seatNo: who, heroId: 664 }); rm.dealBan("b" + other, { seatNo: other, heroId: rm.deal.ban.cands[other][0].id });
+      const liu = [...Object.values(rm.deal.hands).flatMap((h) => h.slots), ...rm.deal.pool].find((s) => s.key === "刘备");
+      check("⭐ ban 掉 SP刘备:刘备坑还在,只剩 刘备/界刘备 两版", rm.deal.phase === "pick" && liu && liu.opts.map((o) => o.id).join() === "1,299");
+    }
+    // 不开临时 ban:行为同旧(直接 pick 阶段)
+    {
+      const rm = room(3, 6);
+      const r = rm.dealStart("b1", { mode: "normal", lordSeat: null, pools: mkPools(), excluded: ["费祎", "SP曹操"] });
+      check("不开临时 ban:直接 pick 阶段;excluded 仅展示", r.ok && rm.deal.phase === "pick" && rm.viewFor("b1").deal.phase === "pick" && rm.viewFor("b1").deal.excluded.join() === "费祎,SP曹操" && rm.viewFor("b1").deal.banned.length === 0);
+    }
+  }
   // 线上发将亮出的武将锁定,不可再手动改;新一局 / 重新发将才解
   {
     const g = (k, id) => ({ key: k, opts: [{ id, name: k, gid: String(id), lord: false }] });

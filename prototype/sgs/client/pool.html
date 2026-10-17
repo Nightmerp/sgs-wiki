@@ -49,6 +49,11 @@ details.fam[open]>summary::before{content:"▾"}
 .h{font-size:13px;padding:3px 9px 3px 7px;border-radius:6px;border:1px solid var(--line);border-left:4px solid var(--qun);background:transparent;color:var(--soft);position:relative}
 .h.f-wei{border-left-color:var(--wei)}.h.f-shu{border-left-color:var(--shu)}.h.f-wu{border-left-color:var(--wu)}
 .h.f-jin{border-left-color:var(--jin)}.h.f-shen{border-left-color:var(--shen)}
+/* 临时 ban 池页:选中=进临时 ban 池(紫);发将开「本局临时 ban」时各人从中随机 3~5 选 1 ban 掉;不在本环境将池里的将加删除线(ban 了也没意义) */
+body.l-temp .h.on{background:#efe9f6;color:#4d3a72;border-color:#6b4a86;font-weight:600}
+body.l-temp .h.on::after{content:"⌛";margin-left:4px;font-size:11px}
+body.l-temp .h.x{text-decoration:line-through;text-decoration-color:#6b4a86}
+.tab.temp.on{background:#6b4a86;border-color:#6b4a86;color:#fff}
 /* 白名单页:选中=入池(金);该环境被禁的将加删除线提示 */
 body.l-white .h.on{background:#fff7e6;color:var(--ink);border-color:var(--qi);font-weight:600}
 body.l-white .h.on::after{content:"✓";color:var(--seal);margin-left:4px;font-size:11px}
@@ -69,7 +74,7 @@ body.l-ban .h.x{color:var(--ink);border-style:dashed}
 </head>
 <body class="l-white">
 <h1>将池编辑</h1>
-<div class="sub">各环境的白名单(可发将)与黑名单(禁将) · 保存后房间立即生效</div>
+<div class="sub">各环境的白名单(可发将)、黑名单(禁将)、临时 ban 池 · 保存后房间立即生效</div>
 
 <div id="bar">
   <div class="row">
@@ -82,6 +87,7 @@ body.l-ban .h.x{color:var(--ink);border-style:dashed}
   <div class="row" style="margin-top:7px">
     <button class="tab white on" data-list="white">白名单 · 可发将</button>
     <button class="tab ban" data-list="ban">黑名单 · 禁将</button>
+    <button class="tab temp" data-list="temp">临时 ban 池</button>
   </div>
   <div id="tip"></div>
   <div class="row" style="margin-top:7px">
@@ -108,7 +114,7 @@ const FAM_ORDER=["标准","神话再临","界限突破","一将成名","界一�
 const FAM_LAST=["国战"];
 const FCLS={"魏":"wei","蜀":"shu","吴":"wu","群":"qun","晋":"jin","神":"shen"};
 let HEROES=[],KEYS=[],CFG={},seen=new Set(),hasSaved=false,savedSnap="",filter="all",q="";
-let env="",list="white"; // 当前环境 / 当前名单(white|ban)
+let env="",list="white"; // 当前环境 / 当前名单(white|ban|temp)
 const closed=new Set(FAM_LAST);
 const DEF=()=>KEYS[0];                       // 默认环境(军争):其它环境白名单留空时沿用它
 const cur=()=>CFG[env][list];                // 当前正在编辑的那个 Set
@@ -118,7 +124,8 @@ const effWhite=k=>CFG[k].white.size?CFG[k].white:CFG[DEF()].white; // 该环境�
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),1800);}
 const famOf=p=>String(p||"其他").split("-")[0];
 function famRank(f){const i=FAM_ORDER.indexOf(f);if(i>=0)return i;if(FAM_LAST.includes(f))return 900+FAM_LAST.indexOf(f);return 500;}
-const snap=()=>JSON.stringify(KEYS.map(k=>[[...CFG[k].white].sort((a,b)=>a-b),[...CFG[k].ban].sort((a,b)=>a-b)]));
+const snap=()=>JSON.stringify(KEYS.map(k=>[[...CFG[k].white].sort((a,b)=>a-b),[...CFG[k].ban].sort((a,b)=>a-b),[...CFG[k].temp].sort((a,b)=>a-b)]));
+const effTemp=k=>CFG[k].temp.size?CFG[k].temp:CFG[DEF()].temp; // 临时 ban 池同白名单规则:该环境为空 → 沿用军争
 const dirty=()=>snap()!==savedSnap;
 function matches(h){
   const s=cur();
@@ -166,7 +173,8 @@ function build(){
 function refresh(){
   const byId=new Map(HEROES.map(h=>[h.id,h])),s=cur();
   // x 标记:白名单页=该环境被禁的将;黑名单页=在该环境实际将池里的将
-  const mark=list==="white"?CFG[env].ban:effWhite(env);
+  const mark=list==="white"?CFG[env].ban:list==="ban"?effWhite(env):new Set(); // 临时 ban 页:下面单独算
+  if(list==="temp"){ const w=effWhite(env),b=CFG[env].ban; for(const h of HEROES) if(!w.has(h.id)||b.has(h.id)) mark.add(h.id); } // 不在本环境将池(没进白名单或被禁)→ 删除线
   document.body.className="l-"+list;
   const pc={},fc={};
   document.querySelectorAll(".h").forEach(b=>{
@@ -180,14 +188,18 @@ function refresh(){
   document.querySelectorAll("[data-fcnt]").forEach(e=>{const c=fc[e.dataset.fcnt]||[0,0,0];e.innerHTML=`<b>${c[0]}</b> / ${c[1]}`;e.closest("details").classList.toggle("hide",c[2]===0);});
   // 顶栏
   $("#envs").innerHTML=KEYS.map(k=>{const c=CFG[k],inh=k!==DEF()&&!c.white.size;
-    return `<button class="env${k===env?" on":""}" data-env="${esc(k)}">${esc(c.label||k)}<small>白 ${inh?"沿用军争":c.white.size} · 黑 ${c.ban.size}</small></button>`;}).join("");
+    return `<button class="env${k===env?" on":""}" data-env="${esc(k)}">${esc(c.label||k)}<small>白 ${inh?"沿用军争":c.white.size} · 黑 ${c.ban.size} · 临 ${k!==DEF()&&!c.temp.size?"沿用":c.temp.size}</small></button>`;}).join("");
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.dataset.list===list));
   const lab=esc(CFG[env].label||env);
-  $("#count").innerHTML=`${lab} · ${list==="white"?"白名单":"黑名单"} <span style="color:var(--seal)">${s.size}</span> 将`;
+  $("#count").innerHTML=`${lab} · ${list==="white"?"白名单":list==="ban"?"黑名单":"临时 ban 池"} <span style="color:var(--seal)">${s.size}</span> 将`;
   let tip="";
   if(list==="white"){
     if(env!==DEF()&&!s.size) tip=`这个环境还没单独设白名单 → 发将时<b>沿用「${esc(CFG[DEF()].label)}」的 ${CFG[DEF()].white.size} 将</b>。想要专属将池就在下面勾选,或 <button class="mini" data-copydef="1">复制军争白名单过来再改</button>`;
     else tip=`白名单 = 这个环境可以发的武将。同名武将勾一个即可(黄盖/界黄盖 算一个坑,任选其一)。带<span style="text-decoration:line-through;text-decoration-color:var(--seal)">删除线</span>的是本环境黑名单里的将。`;
+  } else if(list==="temp"){
+    const n=effTemp(env).size, inh=env!==DEF()&&!s.size;
+    tip=(inh?`这个环境没单独设 → 发将时<b>沿用「${esc(CFG[DEF()].label)}」的 ${CFG[DEF()].temp.size} 将</b>。`:"")
+      +`临时 ban 池 = 出场太频繁、想压一压但又不想永久禁的强将。发将时勾「本局临时 ban」,每人从这里随机看 min(5, 池÷人数) 个,各 ban 一个(只 ban 那个版本,同名其它版本照常),本局不出现。<b>每人至少 3 选 1 才能开</b>:现在 ${n} 将,够 ${Math.floor(n/3)} 人局。带<span style="text-decoration:line-through;text-decoration-color:#6b4a86">删除线</span>的不在本环境将池里,勾了也不会抽到。`;
   } else tip=`黑名单 = 当前环境禁用的强将:发将时不会发出,手动选将会被拒,房间里的「禁将池」展示的就是这份。<span style="border-bottom:1px dashed var(--ink);color:var(--ink)">虚线框</span>的是本环境将池里的将。`;
   $("#tip").innerHTML=tip;
   const d=dirty(); $("#dirty").textContent=d?"● 未保存":""; $("#b-save").disabled=!d;
@@ -208,7 +220,7 @@ document.addEventListener("click",e=>{
   if(t.dataset.f){filter=t.dataset.f;document.querySelectorAll(".fl").forEach(b=>b.classList.toggle("on",b===t));refresh();return;}
 });
 $("#q").addEventListener("input",e=>{q=e.target.value.trim();refresh();});
-const payload=()=>({pools:Object.fromEntries(KEYS.map(k=>[k,{white:[...CFG[k].white].sort((a,b)=>a-b),ban:[...CFG[k].ban].sort((a,b)=>a-b)}]))});
+const payload=()=>({pools:Object.fromEntries(KEYS.map(k=>[k,{white:[...CFG[k].white].sort((a,b)=>a-b),ban:[...CFG[k].ban].sort((a,b)=>a-b),temp:[...CFG[k].temp].sort((a,b)=>a-b)}]))});
 $("#b-save").onclick=async()=>{
   $("#b-save").disabled=true;
   try{
@@ -226,7 +238,7 @@ window.addEventListener("beforeunload",e=>{if(dirty()){e.preventDefault();e.retu
     const [g,p]=await Promise.all([fetch("/generals.json",{cache:"no-store"}).then(r=>r.json()),fetch("/api/pool",{cache:"no-store"}).then(r=>r.json())]);
     HEROES=g; const valid=new Set(g.map(h=>h.id));
     KEYS=Object.keys(p.pools||{}); env=KEYS[0];
-    for(const k of KEYS) CFG[k]={label:p.pools[k].label,white:new Set((p.pools[k].white||[]).filter(i=>valid.has(i))),ban:new Set((p.pools[k].ban||[]).filter(i=>valid.has(i)))};
+    for(const k of KEYS) CFG[k]={label:p.pools[k].label,white:new Set((p.pools[k].white||[]).filter(i=>valid.has(i))),ban:new Set((p.pools[k].ban||[]).filter(i=>valid.has(i))),temp:new Set((p.pools[k].temp||[]).filter(i=>valid.has(i)))};
     seen=new Set(p.seen||[]); hasSaved=!!p.updatedAt&&seen.size>0; // 从未保存过时不标「新」
     savedSnap=snap();
     build();

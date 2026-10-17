@@ -3,7 +3,7 @@
 
 import { RoomCore, setBannedPools, banPoolForSeats, setHeroInfo } from "./shared/room-logic.mjs";
 import { identModesForClient } from "./shared/identity.mjs"; // 身份自动发放:模式表(发身份设置弹层用)
-import { buildDealPools } from "./shared/deal.mjs"; // 线上发将:组池(同名成坑/曹丕仅君主/董昭仅身份局/模式专属君主)
+import { buildDealPools, dropIdsFromPools, opt as dealOpt } from "./shared/deal.mjs"; // 线上发将:组池(同名成坑/曹丕仅君主/董昭仅身份局/模式专属君主)
 import { RoomDOBase, jsonResponse, htmlResponse, routeRoomWs } from "../common/room-do.mjs";
 import ROOM_HTML from "./client/room.html"; // 文本模块(.html 默认即 Text)
 import POOL_HTML from "./client/pool.html"; // 将池(白名单)编辑页 /pool
@@ -147,6 +147,7 @@ export class SgsConfigDO {
       pools[k] = {
         white: p ? (p.white || []) : (k === POOL_KEYS[0] ? ((raw && raw.ids) || POOL_SEED.ids || []) : []),
         ban: p ? (p.ban || []) : (BANNED_DATA.pools[k].ids || []),
+        temp: p ? (p.temp || []) : [], // 临时 ban 池:发将时各人从中随机 3~5 选 1 ban 掉(2026-10-17)
       };
     }
     return { pools, seen: (raw && raw.seen) || [], updatedAt: (raw && raw.updatedAt) || null };
@@ -180,13 +181,13 @@ export class SgsConfigDO {
       const pools = {};
       for (const k of POOL_KEYS) {
         const b = body && body.pools && body.pools[k];
-        pools[k] = b ? { white: norm(b.white), ban: norm(b.ban) } : cur.pools[k]; // 没带的环境保持原样
+        pools[k] = b ? { white: norm(b.white), ban: norm(b.ban), temp: b.temp === undefined ? cur.pools[k].temp : norm(b.temp) } : cur.pools[k]; // 没带的环境保持原样;旧客户端不带 temp 则保留
       }
       if (body && Array.isArray(body.ids) && !(body.pools && body.pools[POOL_KEYS[0]])) pools[POOL_KEYS[0]].white = norm(body.ids); // 兼容旧客户端 {ids}
       const saved = { pools, seen: body && body.seen ? norm(body.seen) : cur.seen, updatedAt: Date.now() };
       await this.state.storage.put("pool", saved);
       return new Response(JSON.stringify({ ok: true, updatedAt: saved.updatedAt,
-        counts: Object.fromEntries(POOL_KEYS.map((k) => [k, { white: pools[k].white.length, ban: pools[k].ban.length }])) }), { headers: noStore });
+        counts: Object.fromEntries(POOL_KEYS.map((k) => [k, { white: pools[k].white.length, ban: pools[k].ban.length, temp: pools[k].temp.length }])) }), { headers: noStore });
     }
     const cfg = await this.load();
     for (const k of POOL_KEYS) Object.assign(cfg.pools[k], POOL_META[k]);
@@ -235,6 +236,7 @@ export class RoomDO extends RoomDOBase {
       case "setFaction": return core.setFaction(id, msg.seatNo, msg.faction);        // 神将自选势力
       // ── 线上发将 ──
       case "dealStart": return this.dealStart(id, msg, core);                        // async:先读全局将池白名单
+      case "dealBan": return core.dealBan(id, msg);                                 // 本局临时 ban:各人 ban 一个
       case "dealSwap": return core.dealSwap(id, msg);
       case "dealPick": return core.dealPick(id, msg);
       case "dealReveal": return core.dealReveal(id);
@@ -262,7 +264,31 @@ export class RoomDO extends RoomDOBase {
     const wl = own.length ? own : cfg.pools[POOL_KEYS[0]].white;
     if (!wl.length) return { error: "POOL_NOT_SET" };
     const banned = core.banEnabled !== false ? cfg.pools[key].ban : [];
-    const pools = buildDealPools({ heroes: GENERALS_DATA, whitelist: wl, banned, mode: msg.mode });
-    return core.dealStart(id, { mode: msg.mode, lordSeat: msg.lordSeat, pools, poolKey: key, poolLabel: POOL_META[key].label + (own.length ? "" : "·沿用军争池") });
+    let pools = buildDealPools({ heroes: GENERALS_DATA, whitelist: wl, banned, mode: msg.mode });
+    const poolIds = () => new Set([...pools.normal, ...pools.lord, ...(pools.forced ? [pools.forced] : [])].flatMap((g) => g.opts.map((o) => o.id)));
+    // 开关②「排除今日已登场」(小伙伴的 idea,默认关):从历史对局里取今天(北京时间)已落座过的武将名,按版本剔除;剔完不够发会报 POOL_TOO_SMALL
+    let excluded = null;
+    if (msg.excludeToday) {
+      let names = new Set();
+      try {
+        const h = await this.env.SGS_CONFIG.get(this.env.SGS_CONFIG.idFromName("global")).fetch("https://config/api/history").then((r) => r.json());
+        const now = Date.now(), dayStart = now - ((now + 8 * 3600e3) % 86400e3); // 北京时间当天 0 点
+        for (const rec of h.list || []) if ((rec.t0 || 0) >= dayStart) for (const s of rec.seats || []) if (s.general) names.add(s.general);
+      } catch { /* 读不到历史就当今天没人登场 */ }
+      const ids = GENERALS_DATA.filter((x) => names.has(x.name)).map((x) => x.id);
+      const before = poolIds();
+      pools = dropIdsFromPools(pools, ids);
+      const after = poolIds();
+      excluded = GENERALS_DATA.filter((x) => before.has(x.id) && !after.has(x.id)).map((x) => x.name); // 真正从本局将池里剔掉的
+    }
+    // 开关①「本局临时 ban」:候选 = 该环境的临时 ban 池(空则沿用军争)∩ 本局将池;池太小 core 会报 TEMPBAN_TOO_SMALL
+    let tempBan = null;
+    if (msg.tempBan) {
+      const tl = (cfg.pools[key].temp && cfg.pools[key].temp.length) ? cfg.pools[key].temp : (cfg.pools[POOL_KEYS[0]].temp || []);
+      const inPool = poolIds();
+      tempBan = GENERALS_DATA.filter((x) => tl.includes(x.id) && inPool.has(x.id)).map(dealOpt);
+      if (!tempBan.length) return { error: "TEMPBAN_EMPTY" };
+    }
+    return core.dealStart(id, { mode: msg.mode, lordSeat: msg.lordSeat, pools, poolKey: key, poolLabel: POOL_META[key].label + (own.length ? "" : "·沿用军争池"), tempBan, excluded });
   }
 }

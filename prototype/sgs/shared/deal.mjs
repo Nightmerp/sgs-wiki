@@ -35,7 +35,16 @@ export function heroBaseName(name) { return (name || "").replace(/^(?:移动版)
 export function groupKey(h) { return h.name.startsWith("神") ? h.name : heroBaseName(h.name); }
 export function hasLordSkill(h) { return (h.skills || []).some((s) => /^主公技/.test(s.effect || "")); }
 
-const opt = (h) => ({ id: h.id, name: h.name, gid: h.tool || String(h.id), lord: hasLordSkill(h) });
+export const opt = (h) => ({ id: h.id, name: h.name, gid: h.tool || String(h.id), lord: hasLordSkill(h) });
+export const DEAL_TEMPBAN_MIN = 3; // 临时 ban:每人至少 3 选 1 才能开
+export const DEAL_TEMPBAN_MAX = 5; // 每人最多看 5 个候选
+// 从组池里剔除指定武将 id(按版本:SP刘备被 ban,其它版本刘备照旧);整坑没版本了就删坑;专属君主被剔则 forced=null
+export function dropIdsFromPools(pools, ids) {
+  const bad = new Set([...ids].map(Number));
+  const cut = (list) => (list || []).map((g) => ({ key: g.key, opts: g.opts.filter((o) => !bad.has(o.id)) })).filter((g) => g.opts.length);
+  const forced = pools.forced ? cut([pools.forced])[0] || null : null;
+  return { normal: cut(pools.normal), lord: cut(pools.lord), forced };
+}
 
 /**
  * 组池。

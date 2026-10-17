@@ -1,6 +1,6 @@
 # SGS-Wiki 线下房间 · 交接文档
 
-> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **747 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
+> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **761 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
 
 ## ⭐⭐ 2026-09-24:多游戏架构 + 风声(游卡典藏版)房间 v1 —— 新会话先读这段,再读下面三国杀状态
 
@@ -24,7 +24,7 @@
 
 ## ⭐ 最新状态(2026-09-22,graduate + 3 新将 + 谋程昱工具 + 神典韦池扩到 33,全部 push 到 main)—— 新会话先读这段
 
-**基线**:`node prototype/sgs/room-sim.mjs` → **747 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
+**基线**:`node prototype/sgs/room-sim.mjs` → **761 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
 
 **规模**:武将库 **710 将**(696 OL = 官网花名册全量 + 14 手录/线下,含《不臣之君》3 模式将)· 房间工具 **24 个** · 装备库 **58 张** · 选将支持拼音。
 
@@ -44,7 +44,7 @@
   - **✅ 分环境名单 + 黑名单上服务端(2026-10-02)**:`SgsConfigDO` 存储改为 `{pools:{junzheng|2v2|douzhu|1v1:{white,ban}}, seen, updatedAt}`(旧格式 `{ids}` 读取时自动迁移:ids→军争白名单,黑名单取 banned-generals.json 种子)。`/pool` 页顶部切环境 + 「白名单/黑名单」页签;非军争环境白名单留空=沿用军争(页面有「复制军争白名单」按钮)。**禁将从此在 /pool 页维护,保存即生效**:
     `RoomDO.syncConfig`(20 秒节流,每条消息前跑)把黑名单灌进 RoomCore 的 BANNED_POOLS 并设 `core.cfgRev`;`/banned-generals.json` 改为现读配置(no-store);客户端见 `roomState.cfgRev` 变了就重拉禁将面板。
     发将:环境=发将设置里手选的「将池」或按座位数自动(`banPoolForSeats`),白名单取该环境(空则军争),黑名单取该环境自己的。`banned-generals.json` 现在只提供四个环境的 label/seats 与黑名单种子。接口:`PUT /api/pool {pools:{key:{white,ban}}, seen}`(只带部分环境则其余不变;旧的 `{ids}` 仍兼容)。⚠ 浏览器双设备测试:设备名现在在公共库里,用 `RC.deviceId='xx'` 再 connect(直接改 `deviceId` 变量无效,两个标签页会被当成同一台)。
-- **将池(发将白名单)编辑页 `/pool`**(2026-10-01,发将功能的地基):全部武将按「包」分组(`shared/hero-packs.json`,olwiki 各武将页「将灯」全量爬取 772 页;worker 贴成 generals.json 的 `pack` 字段,缺则回退 genre),点武将入池/出池,包级与大类级全选/清空(只作用于当前可见项,配合搜索/筛选),拼音搜索,已选/未选/新录入筛选。**保存直接写服务端**:新 DO `SgsConfigDO`(单例 `idFromName("global")`,绑定 `SGS_CONFIG`,迁移 v3;不继承 RoomDOBase,无 TTL),接口 `GET/PUT /api/pool` → `{ids,seen,updatedAt}`;**无鉴权(用户定)**,改完不用 deploy。`seen`=上次保存时的全量 id,之后新录的武将在编辑页标「新」。`shared/hero-pool-seed.json` 是服务端没存过时的回退 + 仓库备份(页面「导出」→ 覆盖该文件)。**与禁将表互不影响**:禁将=池内但当前环境不让用的强将;没进池的将不出现在禁将面板。大厅「房间设置」有入口链接。⚠ 新录武将后在 hero-packs.json 补一行包名(否则落到 genre 组)。**下一步=发将功能**(每人私密 6 将、每张可换一次、君主位额外 6 张主公技将、选模式则专属君主必进候选、选定自动落座;需求已与用户对齐,见记忆 product-ideas 末节)。
+- **将池(发将白名单)编辑页 `/pool`**(2026-10-01,发将功能的地基;2026-10-17 加第三页签「临时 ban 池」):全部武将按「包」分组(`shared/hero-packs.json`,olwiki 各武将页「将灯」全量爬取 772 页;worker 贴成 generals.json 的 `pack` 字段,缺则回退 genre),点武将入池/出池,包级与大类级全选/清空(只作用于当前可见项,配合搜索/筛选),拼音搜索,已选/未选/新录入筛选。**保存直接写服务端**:新 DO `SgsConfigDO`(单例 `idFromName("global")`,绑定 `SGS_CONFIG`,迁移 v3;不继承 RoomDOBase,无 TTL),接口 `GET/PUT /api/pool` → `{ids,seen,updatedAt}`;**无鉴权(用户定)**,改完不用 deploy。`seen`=上次保存时的全量 id,之后新录的武将在编辑页标「新」。`shared/hero-pool-seed.json` 是服务端没存过时的回退 + 仓库备份(页面「导出」→ 覆盖该文件)。**与禁将表互不影响**:禁将=池内但当前环境不让用的强将;没进池的将不出现在禁将面板。大厅「房间设置」有入口链接。⚠ 新录武将后在 hero-packs.json 补一行包名(否则落到 genre 组)。**下一步=发将功能**(每人私密 6 将、每张可换一次、君主位额外 6 张主公技将、选模式则专属君主必进候选、选定自动落座;需求已与用户对齐,见记忆 product-ideas 末节)。
 - **规则集**(2026-09-25):大厅禁将池下方目录卡,数据 `shared/rules.json` [{id,title,sub,html}];worker `/rules.json`(目录)+`/rules/{id}.html`(自包含整页,弹层 iframe 加载)。现 5 条:暴虐无道/失心疯/大忠似奸(官方)+大忠似奸·变种规则(房规)+无间道。**加规则=往 rules.json 追加一条+deploy**;武将衍生技里只留一行指引,正文只在规则集维护。**2026-10-01:「登场工具」卡已撤,工具入口直接放座位卡标题行(`工具 →`,所有人可见,本人为主色)**;大厅顺序 座位→全场状态→禁将池→规则集→房间设置。窄屏下 `.seat .st{min-width:max-content}` 让按钮整体换行而不是挤折武将名标签
 
 **⚠ 部署**:worker 相关改动由用户自己 `cd prototype/worker && npx wrangler deploy`。贾充/族陆郁生/拼音搜索已 deploy(用户 2026-09-15 确认);**graduate + 3 新将 + 谋程昱工具 + 神典韦池这批(generals.json/hero-pinyin/禁将池/room-logic/room.html)待 deploy**;wiki 侧 tools/dianwei.html 已随 push 上 Pages。wiki 侧 `git push` 即 Pages 自动部署。
@@ -84,7 +84,7 @@
 
 ## ✅ 身份自动发放 + 发将武将锁定 + 新一局(2026-10-01,待 deploy)
 
-**基线**:room-sim **747**。
+**基线**:room-sim **761**。
 
 **发将亮出的武将锁定**:`seat.genLocked`(dealPick 君主 / dealReveal 落座时置 true)→ `setGeneral` 拒 `GENERAL_LOCKED`,座位卡不再给「选武将 ▾」。手动选将的座位不锁、下拉照旧。解锁 = 重新发将(参与座位)/ 发身份时清空武将 / 房间设置「🔄 新一局」(`newGame`:清全场武将+身份+进行中的发将,座位与持有者不动)。
 
@@ -114,6 +114,12 @@
 - 顺手修:`maybeSeedPanel` 的 panelSeeded 以前不清,同一座位 A→B→A(或新一局后同座同将)不再播种血量;现在座位换将/清空时忘掉旧记录。
 
 **⚠ Cloudflare 免费额度告警(2026-10-06)→ DO WebSocket 改休眠模式(`common/room-do.mjs`,待 deploy)**:邮件「Durable Objects daily operation limit 90%」超的是 **duration(GB·s)** 不是请求数。原因:原先 `ws.accept()+addEventListener` 是非休眠 WebSocket,只要有一个连接挂着(手机后台留着页面、客户端自动重连)DO 就常驻内存按时长计费;免费额度 13,000 GB·s/天 ≈ 一个 128MB DO 活 29 小时,几间房各挂一台手机就超。现改为 **Hibernation API**:`state.acceptWebSocket(ws)` + `webSocketMessage/webSocketClose/webSocketError` 回调;连接↔deviceId 存 `ws.serializeAttachment({d})`(不能存 this 上,休眠会丢);`sockets()=state.getWebSockets()`;`this.core` 休眠后为 null 由 ensureCore 回灌;没人在线时 onClose 不回灌 core(让 DO 尽快空闲)。三国杀/风声共用同一基类,行为不变(本地双标签验过 认领/改名/广播/断线重连/解散/风声)。⚠ 本地 wrangler dev 里客户端直接关页面会打一行 `Uncaught Error: Network connection lost`——是运行时对异常断开的日志,无害。**deploy 后用量看**:dash.cloudflare.com → Workers & Pages → Durable Objects → 看 Duration 曲线应明显掉下来;若还高,再查 alarm/其它。
+
+**⭐ 2026-10-17 发将两个开关:本局临时 ban + 排除今日已登场(待 deploy;room-sim **761**)**
+- **临时 ban 池** = `/pool` 页第三个页签(`pools[key].temp`,SgsConfigDO 存;该环境为空沿用军争,同白名单规则)。发将设置勾「本局临时 ban」→ worker 取 临时 ban 池 ∩ 本局将池 作候选 → `core.dealStart(…,{tempBan})` 进 **ban 阶段**(`deal.phase="ban"`,`deal.ban={k,cands,picked}`,`deal.prep` 存着发手牌要用的全部参数):每人 k=min(5, floor(候选÷人数)) 个候选(互不重复),**k<3 → `TEMPBAN_TOO_SMALL`,发将不开始**;各人 `dealBan{seatNo,heroId}` ban 一个(只 ban 该版本,`dropIdsFromPools` 按 id 剔、整坑空才删、专属君主被剔则 forced=null;ban 结果立即公开,不可改);全员 ban 完 → `_dealHands(prep, banned)` 发手牌进 pick 阶段。ban 阶段 dealPick/dealSwap/dealReveal 全拒 `BAN_PHASE`;可中止。候选只给本人(`banCands`),旁人只见「待 ban / ban 了谁」。
+- **排除今日已登场**(小伙伴 idea,默认关):worker 读 `/api/history`(config DO 内部调用),取 **北京时间当天** t0 的记录里所有已落座武将名 → 按版本从本局将池剔除(`deal.excluded` 公开展示剔了几个);剔完不够发 → `POOL_TOO_SMALL`,提示关掉它。
+- 两个开关记本机(localStorage `sgs_dealTempBan/sgs_dealToday`)。`_dealView` 现带 `phase/banK/banned/excluded`;老存档无 phase 当 pick。
+- 评估(给用户的):临时 ban 合理;「今日已登场」作为可选开关可以,但多局之后池子会明显缩水(军争池 ~190 将,8 人局每局用掉 8 个,第 4 局后 6 坑×8 人=48 坑仍够,但同名坑合并后可能吃紧),所以做成默认关 + 不够发时报错而不是悄悄放宽。
 
 **⭐ 2026-10-16 新将核对 + graduate 四将 + 录 谋田丰(库 **710**,待 deploy)**:官网花名册 692→**696**,新增的正是手录的 679逢纪/769谢灵毓/770谋周瑜/748族荀灌 → 已 graduate(删 OFFLINE_HEROES 9022-9025 + `scrape-generals.mjs --ids 679,769,770,748`;`xielingyu` 工具由 TOOL_NAMES 接到 769;官网「元嫡」{0} 占位 → `SKILL_OVERRIDES[769]` 补成【杀】【闪】【桃】;hero-packs/hero-skins(删 alias)/hero-gender/hero-pool-seed/room.html `GRADUATED` 全部换成新 id;**线上 /api/pool 白名单里的旧 id 已用 PUT 换成新 id**)。**谋田丰** = olwiki 659(传说/群/3血/谋-计出万全,执谏+效竭),官网未收录 → 手录 **9026**(皮肤 alias→659 已抓 6 张,性别男已核,拼音已建);graduate 候选现 **4 个**:9009界关平→766 / 9018界钟会→758 / 9001孙寒华(线下版,不毕业)/ **9026谋田丰→659**。olwiki 其余库里没有的(杨奉/谋郭嘉/族荀爽/界朱桓/谋孟获/谋李傕…)品质仍「未标注」=未上线,不录。**核对口径**:olwiki 条目带品质(非"未标注")且库里没有 = 新上线将。
 
