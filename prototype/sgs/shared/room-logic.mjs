@@ -244,7 +244,18 @@ export function filterState(seat, holds) {
   return applyVisibility(VISIBILITY[seat.general], seat.toolState, holds, { ownerSeat: seat.seatNo });
 }
 
+// 「每轮花色台账」通用工具(用户 2026-10-17):技能对某花色每轮只生效一次的武将,用过就把该花色关掉,新一轮全部重开。
+//   谋小乔·绝颜(每轮首次展示一种花色摸一张;绝颜本身每轮限一次)/ 族荀采·点盏(每轮首次使用一种花色;四花色皆如此做摸一张)/ 谋董卓·封赏(每轮每花色限一次)。
+//   全公开、无随机、worker 零改;同一套 reducer,按 generalId 查表给文案。新增同类武将 = 在这张表加一行 + generals.json 挂 tool + room.html 三注册。
+export const SUIT_TRACK_TOOLS = {
+  mouxiaoqiao: { hero: "谋小乔", skill: "绝颜", verb: "展示", once: "绝颜(视为使用)", allDone: null },
+  zuxuncai:    { hero: "族荀采", skill: "点盏", verb: "使用", once: null, allDone: "四种花色皆已使用 → 摸一张牌" },
+  moudongzhuo: { hero: "谋董卓", skill: "封赏", verb: "分配", once: null, allDone: null },
+};
+const SUIT_CN = { S: "黑桃", H: "红桃", C: "梅花", D: "方块" };
 export function initToolState(generalId) {
+  if (SUIT_TRACK_TOOLS[generalId])
+    return { round: 1, used: { S: false, H: false, C: false, D: false }, once: false, log: [] }; // used=本轮已用过的花色;once=本轮「每轮限一次」的那条已用(仅谋小乔绝颜)
   if (generalId === "lvbu")
     return {
       qiRegister: {},        // { [seat]: { cards:[{s,r,n,taken}] } }  含吕布本人座位
@@ -1064,6 +1075,37 @@ export class RoomCore extends RoomBase {
         return { ok: true };
       }
       if (t === "resetGame") { if (!isLys) return { error: "NOT_LYS_ACTION" }; target.toolState = initToolState(target.general); return { ok: true, reset: true }; }
+      return { error: "UNKNOWN_ACTION" };
+    }
+
+    // ───────── 每轮花色台账(谋小乔/族荀采/谋董卓 共用;配置见 SUIT_TRACK_TOOLS)─────────
+    if (SUIT_TRACK_TOOLS[target.general]) {
+      const cfg = SUIT_TRACK_TOOLS[target.general], sSeat = targetSeat;
+      const isMe = bySeat === sSeat && iHold(sSeat);
+      if (!ts.used) ts.used = { S: false, H: false, C: false, D: false };
+      if (t === "stToggle") { // 勾/取消 本轮某花色已用(取消=纠错)
+        if (!isMe) return { error: "NOT_OWNER_ACTION" };
+        const su = String(toolAction.suit);
+        if (!(su in SUIT_CN)) return { error: "BAD_SUIT" };
+        ts.used[su] = !ts.used[su];
+        const all = Object.values(ts.used).every(Boolean);
+        this._log(ts, `第${ts.round || 1}轮 ${SUIT_CN[su]} ${ts.used[su] ? "已" + cfg.verb : "取消(纠错)"}${all && cfg.allDone ? " · " + cfg.allDone : ""}`);
+        return { ok: true, all };
+      }
+      if (t === "stOnce") { // 「每轮限一次」那条(谋小乔绝颜)勾/取消
+        if (!isMe) return { error: "NOT_OWNER_ACTION" };
+        if (!cfg.once) return { error: "UNKNOWN_ACTION" };
+        ts.once = !ts.once;
+        this._log(ts, `第${ts.round || 1}轮 ${cfg.once} ${ts.once ? "已用" : "取消(纠错)"}`);
+        return { ok: true };
+      }
+      if (t === "newRound") { // 新一轮:四花色重开
+        if (!isMe) return { error: "NOT_OWNER_ACTION" };
+        ts.round = (ts.round || 1) + 1; ts.used = { S: false, H: false, C: false, D: false }; ts.once = false;
+        this._log(ts, `第${ts.round}轮开始:花色全部重开`);
+        return { ok: true };
+      }
+      if (t === "resetGame") { if (!isMe) return { error: "NOT_OWNER_ACTION" }; target.toolState = initToolState(target.general); return { ok: true, reset: true }; }
       return { error: "UNKNOWN_ACTION" };
     }
 

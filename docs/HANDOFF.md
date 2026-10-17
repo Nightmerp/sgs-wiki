@@ -1,6 +1,6 @@
 # SGS-Wiki 线下房间 · 交接文档
 
-> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **761 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
+> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **789 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
 
 ## ⭐⭐ 2026-09-24:多游戏架构 + 风声(游卡典藏版)房间 v1 —— 新会话先读这段,再读下面三国杀状态
 
@@ -24,11 +24,11 @@
 
 ## ⭐ 最新状态(2026-09-22,graduate + 3 新将 + 谋程昱工具 + 神典韦池扩到 33,全部 push 到 main)—— 新会话先读这段
 
-**基线**:`node prototype/sgs/room-sim.mjs` → **761 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
+**基线**:`node prototype/sgs/room-sim.mjs` → **789 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
 
 **规模**:武将库 **710 将**(696 OL = 官网花名册全量 + 14 手录/线下,含《不臣之君》3 模式将)· 房间工具 **24 个** · 装备库 **58 张** · 选将支持拼音。
 
-**26 个工具**:魔吕布 / 南华老仙 / 族荀攸 / 谋黄月英 / 魔曹操 / 袁姬 / 钟琰 / 魔司马懿 / 谋董昭 / 神孙权 / 魔貂蝉 / 魔孙权 / 神典韦 / 李傕 / 徐荣 / SP徐氏 / 郭照 / 裴秀 / 蒲元 / 曹婴(伏间随机目标) / 族王明山(剩墨台账+弹雀点数) / 贾充(凶竖秘密猜测,保密) / 族陆郁生(拾昔四花色台账) / 谋程昱(胆持跨座位秘密选类型,保密)/ 神张角(异兆「黄」计数)/ 谢灵毓(元嫡牌名组台账,技能描述随之改写)。
+**29 个工具**:魔吕布 / 南华老仙 / 族荀攸 / 谋黄月英 / 魔曹操 / 袁姬 / 钟琰 / 魔司马懿 / 谋董昭 / 神孙权 / 魔貂蝉 / 魔孙权 / 神典韦 / 李傕 / 徐荣 / SP徐氏 / 郭照 / 裴秀 / 蒲元 / 曹婴(伏间随机目标) / 族王明山(剩墨台账+弹雀点数) / 贾充(凶竖秘密猜测,保密) / 族陆郁生(拾昔四花色台账) / 谋程昱(胆持跨座位秘密选类型,保密)/ 神张角(异兆「黄」计数)/ 谢灵毓(元嫡牌名组台账,技能描述随之改写)/ 谋小乔·族荀采·谋董卓(每轮花色台账,共用一套)。
 
 **房间级功能(已上线代码)**:
 - 全场状态面板:血量/翻面/连环/阵亡(横置已并入连环);残血起手将按 initialHp 播种
@@ -84,7 +84,7 @@
 
 ## ✅ 身份自动发放 + 发将武将锁定 + 新一局(2026-10-01,待 deploy)
 
-**基线**:room-sim **761**。
+**基线**:room-sim **789**。
 
 **发将亮出的武将锁定**:`seat.genLocked`(dealPick 君主 / dealReveal 落座时置 true)→ `setGeneral` 拒 `GENERAL_LOCKED`,座位卡不再给「选武将 ▾」。手动选将的座位不锁、下拉照旧。解锁 = 重新发将(参与座位)/ 发身份时清空武将 / 房间设置「🔄 新一局」(`newGame`:清全场武将+身份+进行中的发将,座位与持有者不动)。
 
@@ -114,6 +114,8 @@
 - 顺手修:`maybeSeedPanel` 的 panelSeeded 以前不清,同一座位 A→B→A(或新一局后同座同将)不再播种血量;现在座位换将/清空时忘掉旧记录。
 
 **⚠ Cloudflare 免费额度告警(2026-10-06)→ DO WebSocket 改休眠模式(`common/room-do.mjs`,待 deploy)**:邮件「Durable Objects daily operation limit 90%」超的是 **duration(GB·s)** 不是请求数。原因:原先 `ws.accept()+addEventListener` 是非休眠 WebSocket,只要有一个连接挂着(手机后台留着页面、客户端自动重连)DO 就常驻内存按时长计费;免费额度 13,000 GB·s/天 ≈ 一个 128MB DO 活 29 小时,几间房各挂一台手机就超。现改为 **Hibernation API**:`state.acceptWebSocket(ws)` + `webSocketMessage/webSocketClose/webSocketError` 回调;连接↔deviceId 存 `ws.serializeAttachment({d})`(不能存 this 上,休眠会丢);`sockets()=state.getWebSockets()`;`this.core` 休眠后为 null 由 ensureCore 回灌;没人在线时 onClose 不回灌 core(让 DO 尽快空闲)。三国杀/风声共用同一基类,行为不变(本地双标签验过 认领/改名/广播/断线重连/解散/风声)。⚠ 本地 wrangler dev 里客户端直接关页面会打一行 `Uncaught Error: Network connection lost`——是运行时对异常断开的日志,无害。**deploy 后用量看**:dash.cloudflare.com → Workers & Pages → Durable Objects → 看 Duration 曲线应明显掉下来;若还高,再查 alarm/其它。
+
+**⭐ 2026-10-17 「每轮花色台账」通用工具(现 **29 工具**,待 deploy)**:谋小乔·绝颜(`mouxiaoqiao`)/ 族荀采·点盏(`zuxuncai`)/ 谋董卓·封赏(`moudongzhuo`)三将共用一套 reducer:`SUIT_TRACK_TOOLS` 表(room-logic.mjs,给 hero/skill/verb/once/allDone 文案)+ `initToolState={round,used:{S,H,C,D},once,log}` + 动作 `stToggle{suit}`(勾/取消,取消=纠错)/ `stOnce`(仅配置了 once 的,谋小乔「绝颜每轮限一次」)/ `newRound`(四花色重开,round+1)/ `resetGame`;客户端 `SUIT_UI` 表 + `viewSuitTool/bindSuit`(四花色大按钮,用过划掉变灰;荀采四花色齐亮「摸一张」)。全公开、worker 零改;三将 tool 直写 generals.json + TOOL_NAMES。**再加同类武将 = 两张表各加一行 + generals.json 挂 tool + room.html 三注册**。
 
 **⭐ 2026-10-17 发将两个开关:本局临时 ban + 排除今日已登场(待 deploy;room-sim **761**)**
 - **临时 ban 池** = `/pool` 页第三个页签(`pools[key].temp`,SgsConfigDO 存;该环境为空沿用军争,同白名单规则)。发将设置勾「本局临时 ban」→ worker 取 临时 ban 池 ∩ 本局将池 作候选 → `core.dealStart(…,{tempBan})` 进 **ban 阶段**(`deal.phase="ban"`,`deal.ban={k,cands,picked}`,`deal.prep` 存着发手牌要用的全部参数):每人 k=min(5, floor(候选÷人数)) 个候选(互不重复),**k<3 → `TEMPBAN_TOO_SMALL`,发将不开始**;各人 `dealBan{seatNo,heroId}` ban 一个(只 ban 该版本,`dropIdsFromPools` 按 id 剔、整坑空才删、专属君主被剔则 forced=null;ban 结果立即公开,不可改);全员 ban 完 → `_dealHands(prep, banned)` 发手牌进 pick 阶段。ban 阶段 dealPick/dealSwap/dealReveal 全拒 `BAN_PHASE`;可中止。候选只给本人(`banCands`),旁人只见「待 ban / ban 了谁」。

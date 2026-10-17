@@ -951,6 +951,30 @@ console.log("\n=== 场景 15h:历史对局记录 ===");
   check("局 id 进 serialize/hydrate", back.game && back.game.id === rm.game.id);
 }
 
+// ============ 场景 15i:每轮花色台账(谋小乔/族荀采/谋董卓 共用)============
+console.log("\n=== 场景 15i:每轮花色台账 ===");
+{
+  const { SUIT_TRACK_TOOLS } = await import("./shared/room-logic.mjs");
+  check("三个武将共用一套配置", Object.keys(SUIT_TRACK_TOOLS).sort().join() === "moudongzhuo,mouxiaoqiao,zuxuncai");
+  for (const gid of Object.keys(SUIT_TRACK_TOOLS)) {
+    const rm = new RoomCore("3583", 3, () => 0);
+    const d = {}; for (let i = 1; i <= 3; i++) { d[i] = gid + i; rm.claimSeat(d[i], i); }
+    rm.setGeneral(d[1], 1, gid);
+    const act = (by, o) => rm.action(d[by], { targetSeat: 1, bySeat: by, toolAction: o });
+    const T = () => rm.seats[1].toolState, cfg = SUIT_TRACK_TOOLS[gid];
+    check(`${cfg.hero}:init 四花色全开、第 1 轮`, T().round === 1 && Object.values(T().used).every((x) => !x));
+    check(`${cfg.hero}:非本人不能勾;非法花色拒`, act(2, { type: "stToggle", suit: "S" }).error === "NOT_OWNER_ACTION" && act(1, { type: "stToggle", suit: "X" }).error === "BAD_SUIT");
+    check(`${cfg.hero}:勾黑桃/红桃/梅花 → 关闭`, act(1, { type: "stToggle", suit: "S" }).all === false && act(1, { type: "stToggle", suit: "H" }).ok && act(1, { type: "stToggle", suit: "C" }).ok && T().used.S && T().used.H && T().used.C && !T().used.D);
+    check(`${cfg.hero}:再点一次=取消(纠错)`, act(1, { type: "stToggle", suit: "C" }).ok && !T().used.C);
+    check(`${cfg.hero}:四花色齐 → all=true`, act(1, { type: "stToggle", suit: "C" }).ok && act(1, { type: "stToggle", suit: "D" }).all === true);
+    if (cfg.once) check(`${cfg.hero}:每轮限一次那条可勾/取消`, act(1, { type: "stOnce" }).ok && T().once === true && act(1, { type: "stOnce" }).ok && T().once === false);
+    else check(`${cfg.hero}:没有「每轮限一次」项 → stOnce 拒`, act(1, { type: "stOnce" }).error === "UNKNOWN_ACTION");
+    check(`${cfg.hero}:新一轮全部重开`, act(1, { type: "newRound" }).ok && T().round === 2 && Object.values(T().used).every((x) => !x) && T().once === false);
+    check(`${cfg.hero}:全场公开 + 序列化存活`, rm.viewFor(d[3]).seats[1].toolState.round === 2 && RoomCore.hydrate(rm.serialize()).seats[1].toolState.round === 2);
+    check(`${cfg.hero}:重开`, act(1, { type: "resetGame" }).reset === true && T().round === 1);
+  }
+}
+
 // ============ 场景 16:徐荣 暴戾(凶镬发放/三选一结算 + 杀绝濒死+1)============
 console.log("\n=== 场景 16:徐荣 暴戾 ===");
 const roomX = new RoomCore("4812", 4, () => 0); // rng=0 → 结算恒为效果0(灼伤)

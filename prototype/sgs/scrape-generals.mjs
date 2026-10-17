@@ -130,6 +130,9 @@ export const TOOL_NAMES = {
   "族王明山": "wangmingshan", // OL 已收录(id608);剩墨台账,同上防重爬丢失
   "贾充": "jiachong", // OL 已收录(id7019);凶竖秘密猜测,同上防重爬丢失
   "族陆郁生": "zuluyusheng", // OL 已收录(id751);拾昔花色台账,同上防重爬丢失
+  "谋小乔": "mouxiaoqiao",   // OL 已收录(id705);每轮花色台账(绝颜),同蒲元法防重爬丢失
+  "族荀采": "zuxuncai",      // OL 已收录(id524);每轮花色台账(点盏)
+  "谋董卓": "moudongzhuo",   // OL 已收录(id605);每轮花色台账(封赏)
   "神张角": "shenzhangjiao", // OL 已收录(id227);异兆「黄」计数器,tool 直写 generals.json,此处防重爬丢失
   "谢灵毓": "xielingyu",     // OL 已收录(id769,2026-10-16 由手录 9023 graduate);元嫡牌名组台账
   "谋程昱": "mouchengyu", // OL 已收录(id734);胆持跨座位秘密选类型,同上防重爬丢失

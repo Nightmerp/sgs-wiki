@@ -11299,7 +11299,7 @@
     "characteristic": "通过横置自身和敌人然后燃烧自己的方式，或多次汰换出少量杀和闪的方式制造伤害，需要频繁规划牌序。",
     "cover": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/xingxiang/52400.png",
     "avatar": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/dianjiang/52400.png",
-    "tool": null,
+    "tool": "zuxuncai",
     "offline": false
   },
   {
@@ -13701,7 +13701,7 @@
     "characteristic": "可以获得额外技能。可以大范围对敌人造成伤害。",
     "cover": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/xingxiang/60500.png",
     "avatar": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/dianjiang/60500.png",
-    "tool": null,
+    "tool": "moudongzhuo",
     "offline": false
   },
   {
@@ -16065,7 +16065,7 @@
     "characteristic": "交给牌可令其他角色回血或失去体力；展示牌可获得额外收益。",
     "cover": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/xingxiang/70500.png",
     "avatar": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/dianjiang/70500.png",
-    "tool": null,
+    "tool": "mouxiaoqiao",
     "offline": false
   },
   {
