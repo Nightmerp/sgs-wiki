@@ -222,6 +222,10 @@ export const VISIBILITY = {
     neixun: { kind: "ownerSeatOnly" },
     // color / seq / log 默认 public(椒遇声明色是全场信息;log 只记张数不记牌名)
   },
+  xizhicai: {
+    // 先辅:游戏开始时秘密选的目标,公开前仅戏志才本人/代持可见;他人只见 {count:0|1}=有无选定。revealed(公开后的座位)/ log 默认 public
+    target: { kind: "ownerSeatOnly" },
+  },
   jiachong: {
     // 凶竖:猜测内容仅贾充本人/代持可见(揭晓前全场不可见);他人只见 {count:0|1}=有无猜测
     guess: { kind: "ownerSeatOnly" },
@@ -397,6 +401,8 @@ export function initToolState(generalId) {
     return { records: { S: null, H: null, C: null, D: null }, log: [] }; // 拾昔:每花色首张单目标普通锦囊的牌名(全公开,整局有效)
   if (generalId === "mouchengyu")
     return { pending: null, choice: {}, settle: null, log: [] }; // 胆持:pending={targetSeat,sourceSeat|null,revealed};choice={}|{c}(保密,见 VISIBILITY);settle={actual,diff}(公开)
+  if (generalId === "xizhicai")
+    return { target: {}, revealed: null, log: [] }; // 先辅:target={}|{seat}(保密,见 VISIBILITY);revealed=公开后的目标座位(公开)
   if (generalId === "jiachong")
     return { round: 1, usedThisRound: 0, pending: null, guess: {}, lastReveal: null, log: [] }; // 凶竖:pending={targetSeat,cardName,cost};guess={}|{g}(保密);lastReveal=揭晓结果(公开)
   if (generalId === "shenzhangjiao")
@@ -1236,6 +1242,39 @@ export class RoomCore extends RoomBase {
 
     // ───────── 贾充:凶竖(秘密猜测)。发动=展示目标一张手牌(公开)+ 秘密猜"此阶段是否使用同名牌";
     // 猜测锁定不可改、仅贾充可见(VISIBILITY.guess=ownerSeatOnly);阶段结束点揭晓→公开猜测+实际+对错 ─────────
+    // ───────── 戏志才:先辅(秘密目标)。游戏开始时秘密选一名其他角色,锁定不可改;目标受伤后戏志才点「公开」全场可见。log 措辞不泄露目标 ─────────
+    if (target.general === "xizhicai") {
+      const xSeat = targetSeat;
+      const isXz = bySeat === xSeat && iHold(xSeat);
+      if (!ts.target) ts.target = {};
+      if (t === "xfChoose") { // {targetSeat} 秘密选定,一次性
+        if (!isXz) return { error: "NOT_XZ_ACTION" };
+        if (ts.target.seat != null) return { error: "ALREADY_CHOSEN" };
+        const tg = Number(toolAction.targetSeat);
+        if (!this.seats[tg] || tg === xSeat) return { error: "BAD_SEAT" };
+        ts.target = { seat: tg };
+        this._log(ts, "先辅:已秘密选定目标(公开前只有戏志才看得到)");
+        return { ok: true };
+      }
+      if (t === "xfReveal") { // 目标受伤后公开
+        if (!isXz) return { error: "NOT_XZ_ACTION" };
+        if (ts.target.seat == null) return { error: "NOT_CHOSEN" };
+        if (ts.revealed != null) return { error: "ALREADY_REVEALED" };
+        ts.revealed = ts.target.seat;
+        this._log(ts, `先辅公开:目标是座位 ${ts.revealed}`);
+        return { ok: true, revealed: ts.revealed };
+      }
+      if (t === "xfClear") { // 纠错:公开前可清掉重选
+        if (!isXz) return { error: "NOT_XZ_ACTION" };
+        if (ts.revealed != null) return { error: "ALREADY_REVEALED" };
+        ts.target = {};
+        this._log(ts, "先辅:清除选定(纠错),可重选");
+        return { ok: true };
+      }
+      if (t === "resetGame") { if (!isXz) return { error: "NOT_XZ_ACTION" }; target.toolState = initToolState(target.general); return { ok: true, reset: true }; }
+      return { error: "UNKNOWN_ACTION" };
+    }
+
     if (target.general === "jiachong") {
       const jSeat = targetSeat;
       const isJc = bySeat === jSeat && iHold(jSeat); // 贾充本人(或代持)

@@ -765,6 +765,25 @@ check("跨回合算 X:回合外用 K → X=|13-3|=10", wmsAct(1, { type: "wmsSet
 check("弹雀态进序列化/hydrate", (() => { const h = RoomCore.hydrate(roomW.serialize()); return h.seats[1].toolState.lastRank === "K" && h.seats[1].toolState.lastDiff === 10; })());
 check("重开清空弹雀态", wmsAct(1, { type: "resetGame" }).reset === true && WT().lastRank === null && WT().lastDiff === null);
 
+// ============ 场景 15c2:戏志才 先辅(秘密目标 + 受伤后公开)============
+console.log("\n=== 场景 15c2:戏志才 先辅 ===");
+{
+  const rm = new RoomCore("3584", 4, () => 0);
+  const d = {}; for (let i = 1; i <= 4; i++) { d[i] = `xz${i}`; rm.claimSeat(d[i], i); }
+  rm.setGeneral(d[1], 1, "xizhicai");
+  const act = (by, o) => rm.action(d[by], { targetSeat: 1, bySeat: by, toolAction: o });
+  const T = () => rm.seats[1].toolState, V = (n) => rm.viewFor(d[n]).seats[1].toolState;
+  check("init:未选、未公开", T().target.seat === undefined && T().revealed === null);
+  check("非本人不能选;不能选自己;坏座位拒", act(2, { type: "xfChoose", targetSeat: 3 }).error === "NOT_XZ_ACTION" && act(1, { type: "xfChoose", targetSeat: 1 }).error === "BAD_SEAT" && act(1, { type: "xfChoose", targetSeat: 9 }).error === "BAD_SEAT");
+  check("未选不能公开", act(1, { type: "xfReveal" }).error === "NOT_CHOSEN");
+  check("秘密选定座位 3", act(1, { type: "xfChoose", targetSeat: 3 }).ok && T().target.seat === 3);
+  check("⭐ 保密:本人看到 3;旁人只见 {count:1},且 log 不含座位号", V(1).target.seat === 3 && V(2).target.seat === undefined && V(2).target.count === 1 && V(3).target.count === 1 && !JSON.stringify(V(2)).includes('"seat":3') && !T().log[0].includes("3"));
+  check("选定后不可改", act(1, { type: "xfChoose", targetSeat: 2 }).error === "ALREADY_CHOSEN");
+  check("纠错清除后可重选", act(1, { type: "xfClear" }).ok && T().target.seat === undefined && V(2).target.count === 0 && act(1, { type: "xfChoose", targetSeat: 3 }).ok);
+  check("⭐ 公开:全场可见目标座位,不能再清", act(1, { type: "xfReveal" }).revealed === 3 && V(2).revealed === 3 && V(4).revealed === 3 && act(1, { type: "xfReveal" }).error === "ALREADY_REVEALED" && act(1, { type: "xfClear" }).error === "ALREADY_REVEALED");
+  check("序列化存活 + 重开", RoomCore.hydrate(rm.serialize()).seats[1].toolState.revealed === 3 && act(1, { type: "resetGame" }).reset === true && T().revealed === null);
+}
+
 // ============ 场景 15d:贾充 凶竖(秘密猜测 + 保密投影 + 揭晓)============
 console.log("\n=== 场景 15d:贾充 凶竖 ===");
 const roomJ = new RoomCore("6420", 4, () => 0);

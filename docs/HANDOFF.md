@@ -1,6 +1,6 @@
 # SGS-Wiki 线下房间 · 交接文档
 
-> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **830 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
+> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **839 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
 
 ## ⭐⭐ 2026-09-24:多游戏架构 + 风声(游卡典藏版)房间 v1 —— 新会话先读这段,再读下面三国杀状态
 
@@ -24,11 +24,11 @@
 
 ## ⭐ 最新状态(2026-09-22,graduate + 3 新将 + 谋程昱工具 + 神典韦池扩到 33,全部 push 到 main)—— 新会话先读这段
 
-**基线**:`node prototype/sgs/room-sim.mjs` → **830 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
+**基线**:`node prototype/sgs/room-sim.mjs` → **839 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
 
 **规模**:武将库 **711 将**(696 OL = 官网花名册全量 + 15 手录/线下,含《不臣之君》3 模式将)· 房间工具 **24 个** · 装备库 **58 张** · 选将支持拼音。
 
-**32 个工具**:魔吕布 / 南华老仙 / 族荀攸 / 谋黄月英 / 魔曹操 / 袁姬 / 钟琰 / 魔司马懿 / 谋董昭 / 神孙权 / 魔貂蝉 / 魔孙权 / 神典韦 / 李傕 / 徐荣 / SP徐氏 / 郭照 / 裴秀 / 蒲元 / 曹婴(伏间随机目标) / 族王明山(剩墨台账+弹雀点数) / 贾充(凶竖秘密猜测,保密) / 族陆郁生(拾昔四花色台账) / 谋程昱(胆持跨座位秘密选类型,保密)/ 神张角(异兆「黄」计数)/ 谢灵毓(元嫡牌名组台账,技能描述随之改写)/ 谋小乔·族荀采·谋董卓·晋司马懿·司马昭·界吕蒙(花色台账,共用一套)。
+**33 个工具**:魔吕布 / 南华老仙 / 族荀攸 / 谋黄月英 / 魔曹操 / 袁姬 / 钟琰 / 魔司马懿 / 谋董昭 / 神孙权 / 魔貂蝉 / 魔孙权 / 神典韦 / 李傕 / 徐荣 / SP徐氏 / 郭照 / 裴秀 / 蒲元 / 曹婴(伏间随机目标) / 族王明山(剩墨台账+弹雀点数) / 贾充(凶竖秘密猜测,保密) / 族陆郁生(拾昔四花色台账) / 谋程昱(胆持跨座位秘密选类型,保密)/ 神张角(异兆「黄」计数)/ 谢灵毓(元嫡牌名组台账,技能描述随之改写)/ 谋小乔·族荀采·谋董卓·晋司马懿·司马昭·界吕蒙(花色台账,共用一套)/ 戏志才(先辅秘密目标,保密)。
 
 **房间级功能(已上线代码)**:
 - 全场状态面板:血量/翻面/连环/阵亡(横置已并入连环);残血起手将按 initialHp 播种
@@ -84,7 +84,7 @@
 
 ## ✅ 身份自动发放 + 发将武将锁定 + 新一局(2026-10-01,待 deploy)
 
-**基线**:room-sim **830**。
+**基线**:room-sim **839**。
 
 **发将亮出的武将锁定**:`seat.genLocked`(dealPick 君主 / dealReveal 落座时置 true)→ `setGeneral` 拒 `GENERAL_LOCKED`,座位卡不再给「选武将 ▾」。手动选将的座位不锁、下拉照旧。解锁 = 重新发将(参与座位)/ 发身份时清空武将 / 房间设置「🔄 新一局」(`newGame`:清全场武将+身份+进行中的发将,座位与持有者不动)。
 
@@ -114,6 +114,8 @@
 - 顺手修:`maybeSeedPanel` 的 panelSeeded 以前不清,同一座位 A→B→A(或新一局后同座同将)不再播种血量;现在座位换将/清空时忘掉旧记录。
 
 **⚠ Cloudflare 免费额度告警(2026-10-06)→ DO WebSocket 改休眠模式(`common/room-do.mjs`,待 deploy)**:邮件「Durable Objects daily operation limit 90%」超的是 **duration(GB·s)** 不是请求数。原因:原先 `ws.accept()+addEventListener` 是非休眠 WebSocket,只要有一个连接挂着(手机后台留着页面、客户端自动重连)DO 就常驻内存按时长计费;免费额度 13,000 GB·s/天 ≈ 一个 128MB DO 活 29 小时,几间房各挂一台手机就超。现改为 **Hibernation API**:`state.acceptWebSocket(ws)` + `webSocketMessage/webSocketClose/webSocketError` 回调;连接↔deviceId 存 `ws.serializeAttachment({d})`(不能存 this 上,休眠会丢);`sockets()=state.getWebSockets()`;`this.core` 休眠后为 null 由 ensureCore 回灌;没人在线时 onClose 不回灌 core(让 DO 尽快空闲)。三国杀/风声共用同一基类,行为不变(本地双标签验过 认领/改名/广播/断线重连/解散/风声)。⚠ 本地 wrangler dev 里客户端直接关页面会打一行 `Uncaught Error: Network connection lost`——是运行时对异常断开的日志,无害。**deploy 后用量看**:dash.cloudflare.com → Workers & Pages → Durable Objects → 看 Duration 曲线应明显掉下来;若还高,再查 alarm/其它。
+
+**⭐ 2026-10-17 戏志才「先辅」秘密目标工具(tool `xizhicai`,375 直写 + TOOL_NAMES;现 **33 工具**,room-sim **839**)**:第三个保密工具。`VISIBILITY.xizhicai.target={kind:"ownerSeatOnly"}`(target 恒为对象 `{}`/`{seat}`,旁人折成 `{count}`);`xfChoose{targetSeat}` 一次性秘密选定(不可改)/ `xfClear` 公开前纠错清除 / `xfReveal` 目标受伤后公开(写入公开字段 `revealed`)/ `resetGame`;log 措辞不含座位号(sim 锁)。客户端 `viewXzTool/bindXz`:本人见目标大字,旁人见「🔒 已秘密选定」,公开后全场见。
 
 **⭐ 2026-10-17 斗地主(发身份 + 发将叫地主,待 deploy;room-sim **830**)**:
 - **身份** `IDENT_MODES.douzhu`:3 人,地主 1 农民 2,`allShown`(全部公开),地主转到 1 号位;规则集加「斗地主」(id douzhu,含本桌叫地主)。
