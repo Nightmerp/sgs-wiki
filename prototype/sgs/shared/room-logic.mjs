@@ -251,6 +251,10 @@ export const SUIT_TRACK_TOOLS = {
   mouxiaoqiao: { hero: "谋小乔", skill: "绝颜", verb: "展示", once: "绝颜(视为使用)", allDone: null },
   zuxuncai:    { hero: "族荀采", skill: "点盏", verb: "使用", once: null, allDone: "四种花色皆已使用 → 摸一张牌" },
   moudongzhuo: { hero: "谋董卓", skill: "封赏", verb: "分配", once: null, allDone: null },
+  // 以下三个按「回合/出牌阶段」而不是「轮」重开(period 只影响文案;reducer 同一套,newRound 即「新回合」)
+  jinsimayi:   { hero: "晋司马懿", skill: "权变", verb: "使用或打出", once: null, allDone: null, period: "出牌阶段" },
+  simazhao:    { hero: "司马昭", skill: "昭然", verb: "触发", once: null, allDone: null, period: "出牌阶段" },
+  jielvmeng:   { hero: "界吕蒙", skill: "博图", verb: "进弃牌堆", once: null, allDone: "本回合弃牌堆已含四种花色 → 回合结束后可执行一个额外回合(每轮限 X 次,X=存活角色数且至多 3)", period: "回合" },
 };
 const SUIT_CN = { S: "黑桃", H: "红桃", C: "梅花", D: "方块" };
 export function initToolState(generalId) {
@@ -1089,20 +1093,20 @@ export class RoomCore extends RoomBase {
         if (!(su in SUIT_CN)) return { error: "BAD_SUIT" };
         ts.used[su] = !ts.used[su];
         const all = Object.values(ts.used).every(Boolean);
-        this._log(ts, `第${ts.round || 1}轮 ${SUIT_CN[su]} ${ts.used[su] ? "已" + cfg.verb : "取消(纠错)"}${all && cfg.allDone ? " · " + cfg.allDone : ""}`);
+        this._log(ts, `第${ts.round || 1}${cfg.period || "轮"} ${SUIT_CN[su]} ${ts.used[su] ? "已" + cfg.verb : "取消(纠错)"}${all && cfg.allDone ? " · " + cfg.allDone : ""}`);
         return { ok: true, all };
       }
       if (t === "stOnce") { // 「每轮限一次」那条(谋小乔绝颜)勾/取消
         if (!isMe) return { error: "NOT_OWNER_ACTION" };
         if (!cfg.once) return { error: "UNKNOWN_ACTION" };
         ts.once = !ts.once;
-        this._log(ts, `第${ts.round || 1}轮 ${cfg.once} ${ts.once ? "已用" : "取消(纠错)"}`);
+        this._log(ts, `第${ts.round || 1}${cfg.period || "轮"} ${cfg.once} ${ts.once ? "已用" : "取消(纠错)"}`);
         return { ok: true };
       }
       if (t === "newRound") { // 新一轮:四花色重开
         if (!isMe) return { error: "NOT_OWNER_ACTION" };
         ts.round = (ts.round || 1) + 1; ts.used = { S: false, H: false, C: false, D: false }; ts.once = false;
-        this._log(ts, `第${ts.round}轮开始:花色全部重开`);
+        this._log(ts, `第${ts.round}${cfg.period || "轮"}开始:花色全部重开`);
         return { ok: true };
       }
       if (t === "resetGame") { if (!isMe) return { error: "NOT_OWNER_ACTION" }; target.toolState = initToolState(target.general); return { ok: true, reset: true }; }

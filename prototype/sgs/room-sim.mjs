@@ -955,7 +955,7 @@ console.log("\n=== 场景 15h:历史对局记录 ===");
 console.log("\n=== 场景 15i:每轮花色台账 ===");
 {
   const { SUIT_TRACK_TOOLS } = await import("./shared/room-logic.mjs");
-  check("三个武将共用一套配置", Object.keys(SUIT_TRACK_TOOLS).sort().join() === "moudongzhuo,mouxiaoqiao,zuxuncai");
+  check("六个武将共用一套配置", Object.keys(SUIT_TRACK_TOOLS).sort().join() === "jielvmeng,jinsimayi,moudongzhuo,mouxiaoqiao,simazhao,zuxuncai");
   for (const gid of Object.keys(SUIT_TRACK_TOOLS)) {
     const rm = new RoomCore("3583", 3, () => 0);
     const d = {}; for (let i = 1; i <= 3; i++) { d[i] = gid + i; rm.claimSeat(d[i], i); }
@@ -1451,6 +1451,8 @@ console.log("\n=== 场景 20:线上发将 ===");
     const { groupKey } = await import("./shared/deal.mjs");
     const hd = HEROES.filter((h) => h.name.includes("韩当"));
     check("韩当/界韩当/移动版谋韩当 同一个坑", hd.length === 3 && hd.every((h) => groupKey(h) === "韩当"));
+    const sh = HEROES.filter((h) => h.name.endsWith("孙寒华"));
+    check("孙寒华(OL 9027)/线下孙寒华(9001) 同一个坑", sh.length === 2 && sh.every((h) => groupKey(h) === "孙寒华"));
     const pl = P({ whitelist: [idOf("韩当")] });
     const slot = pl.normal.find((g) => g.key === "韩当");
     check("只勾标韩当:坑里三个版本都可选", slot && slot.opts.map((o) => o.name).sort().join() === ["韩当", "界韩当", "移动版谋韩当"].sort().join());

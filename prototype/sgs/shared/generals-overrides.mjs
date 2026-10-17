@@ -84,10 +84,10 @@ export const SKILL_EN = {
 };
 
 export const OFFLINE_HEROES = [
-  // 孙寒华 —— 三国杀移动版武将线下化,OL 无。faction/hp 已确认(吴/3血)。
+  // 线下孙寒华 —— 三国杀移动版武将线下化。2026-10-17 改名加「线下」前缀:OL 自己出了孙寒华(olwiki 774,手录为 9027),两者是不同武将但同名可替换(heroBaseName 剥「线下」)。faction/hp 已确认(吴/3血)。
   // TODO(原画):用户后补图片文件(建议 prototype/sgs/client/assets/sunhanhua.jpg)或 URL 后,把下面 avatar/cover 接上;线下武将无 OL 图床,可能要给 worker 加静态图路由。
   {
-    id: 9001, name: "孙寒华", genre: "线下", series: "线下", faction: "吴",
+    id: 9001, name: "线下孙寒华", genre: "线下", series: "线下", faction: "吴",
     factionSelectable: false, quality: "线下", hp: 3, initialHp: null,
     tags: ["控制", "过牌"],
     skills: [
@@ -276,6 +276,22 @@ export const OFFLINE_HEROES = [
     characteristic: "藏巧取折戟/女装/驽马三神装并摸至上限，神机把装备当延时锦囊，化朽升级为魂装。",
     cover: "https://initial-jie.github.io/sgs-wiki/assets/heroes/shenhuangyueying.jpg",
     avatar: "https://initial-jie.github.io/sgs-wiki/assets/heroes/shenhuangyueying.jpg",
+    tool: null, offline: true,
+  },
+  // 孙寒华(OL 版)—— olwiki 真 id 774(官网花名册 2026-10-17 未收录,olwiki 品质「未标注」= 测试版),用户已买到实体卡;graduate 候选。
+  // 技能抄自 olwiki;衍生牌【彩莲】与衍生技 荡魔/济惠/霞举 在 derived-cards-room / derived-skills-room 的「孙寒华」条目
+  {
+    id: 9027, name: "孙寒华", genre: "璀璨星河", series: "标", faction: "吴",
+    factionSelectable: false, quality: "测试版", hp: 3, initialHp: null,
+    tags: ["形态切换", "过牌"],
+    skills: [
+      { name: "华光", effect: "每轮开始时、准备阶段，你可选择：1.将【彩莲】置入一个装备栏；2.修改【彩莲】花色。" },
+      { name: "玄白", effect: "锁定技，当【彩莲】进入你的一个装备栏后，你切换为不同的形态：武器栏—荡魔；防具栏—济惠；宝物栏—霞举。" },
+    ],
+    characteristic: "将彩莲置入不同的装备栏切换形态获得更高收益。",
+    cardWarn: "OL 测试版武将(olwiki 品质未标注),技能文本以本房间为准;正式版若有改动再同步",
+    cover: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/big/static/77400.png",
+    avatar: "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/skinShop/77400.png",
     tool: null, offline: true,
   },
   // 谋田丰 —— olwiki 真 id 659(官网花名册 2026-10-16 仍未收录),用户报 OL 当日上线;graduate 候选。技能文本抄自 olwiki(去掉"爆发/卖血"定位角标)

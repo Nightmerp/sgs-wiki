@@ -1,6 +1,6 @@
 # SGS-Wiki 线下房间 · 交接文档
 
-> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **789 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
+> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **817 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
 
 ## ⭐⭐ 2026-09-24:多游戏架构 + 风声(游卡典藏版)房间 v1 —— 新会话先读这段,再读下面三国杀状态
 
@@ -24,11 +24,11 @@
 
 ## ⭐ 最新状态(2026-09-22,graduate + 3 新将 + 谋程昱工具 + 神典韦池扩到 33,全部 push 到 main)—— 新会话先读这段
 
-**基线**:`node prototype/sgs/room-sim.mjs` → **789 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
+**基线**:`node prototype/sgs/room-sim.mjs` → **817 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
 
-**规模**:武将库 **710 将**(696 OL = 官网花名册全量 + 14 手录/线下,含《不臣之君》3 模式将)· 房间工具 **24 个** · 装备库 **58 张** · 选将支持拼音。
+**规模**:武将库 **711 将**(696 OL = 官网花名册全量 + 15 手录/线下,含《不臣之君》3 模式将)· 房间工具 **24 个** · 装备库 **58 张** · 选将支持拼音。
 
-**29 个工具**:魔吕布 / 南华老仙 / 族荀攸 / 谋黄月英 / 魔曹操 / 袁姬 / 钟琰 / 魔司马懿 / 谋董昭 / 神孙权 / 魔貂蝉 / 魔孙权 / 神典韦 / 李傕 / 徐荣 / SP徐氏 / 郭照 / 裴秀 / 蒲元 / 曹婴(伏间随机目标) / 族王明山(剩墨台账+弹雀点数) / 贾充(凶竖秘密猜测,保密) / 族陆郁生(拾昔四花色台账) / 谋程昱(胆持跨座位秘密选类型,保密)/ 神张角(异兆「黄」计数)/ 谢灵毓(元嫡牌名组台账,技能描述随之改写)/ 谋小乔·族荀采·谋董卓(每轮花色台账,共用一套)。
+**32 个工具**:魔吕布 / 南华老仙 / 族荀攸 / 谋黄月英 / 魔曹操 / 袁姬 / 钟琰 / 魔司马懿 / 谋董昭 / 神孙权 / 魔貂蝉 / 魔孙权 / 神典韦 / 李傕 / 徐荣 / SP徐氏 / 郭照 / 裴秀 / 蒲元 / 曹婴(伏间随机目标) / 族王明山(剩墨台账+弹雀点数) / 贾充(凶竖秘密猜测,保密) / 族陆郁生(拾昔四花色台账) / 谋程昱(胆持跨座位秘密选类型,保密)/ 神张角(异兆「黄」计数)/ 谢灵毓(元嫡牌名组台账,技能描述随之改写)/ 谋小乔·族荀采·谋董卓·晋司马懿·司马昭·界吕蒙(花色台账,共用一套)。
 
 **房间级功能(已上线代码)**:
 - 全场状态面板:血量/翻面/连环/阵亡(横置已并入连环);残血起手将按 initialHp 播种
@@ -84,7 +84,7 @@
 
 ## ✅ 身份自动发放 + 发将武将锁定 + 新一局(2026-10-01,待 deploy)
 
-**基线**:room-sim **789**。
+**基线**:room-sim **817**。
 
 **发将亮出的武将锁定**:`seat.genLocked`(dealPick 君主 / dealReveal 落座时置 true)→ `setGeneral` 拒 `GENERAL_LOCKED`,座位卡不再给「选武将 ▾」。手动选将的座位不锁、下拉照旧。解锁 = 重新发将(参与座位)/ 发身份时清空武将 / 房间设置「🔄 新一局」(`newGame`:清全场武将+身份+进行中的发将,座位与持有者不动)。
 
@@ -115,7 +115,12 @@
 
 **⚠ Cloudflare 免费额度告警(2026-10-06)→ DO WebSocket 改休眠模式(`common/room-do.mjs`,待 deploy)**:邮件「Durable Objects daily operation limit 90%」超的是 **duration(GB·s)** 不是请求数。原因:原先 `ws.accept()+addEventListener` 是非休眠 WebSocket,只要有一个连接挂着(手机后台留着页面、客户端自动重连)DO 就常驻内存按时长计费;免费额度 13,000 GB·s/天 ≈ 一个 128MB DO 活 29 小时,几间房各挂一台手机就超。现改为 **Hibernation API**:`state.acceptWebSocket(ws)` + `webSocketMessage/webSocketClose/webSocketError` 回调;连接↔deviceId 存 `ws.serializeAttachment({d})`(不能存 this 上,休眠会丢);`sockets()=state.getWebSockets()`;`this.core` 休眠后为 null 由 ensureCore 回灌;没人在线时 onClose 不回灌 core(让 DO 尽快空闲)。三国杀/风声共用同一基类,行为不变(本地双标签验过 认领/改名/广播/断线重连/解散/风声)。⚠ 本地 wrangler dev 里客户端直接关页面会打一行 `Uncaught Error: Network connection lost`——是运行时对异常断开的日志,无害。**deploy 后用量看**:dash.cloudflare.com → Workers & Pages → Durable Objects → 看 Duration 曲线应明显掉下来;若还高,再查 alarm/其它。
 
-**⭐ 2026-10-17 「每轮花色台账」通用工具(现 **29 工具**,待 deploy)**:谋小乔·绝颜(`mouxiaoqiao`)/ 族荀采·点盏(`zuxuncai`)/ 谋董卓·封赏(`moudongzhuo`)三将共用一套 reducer:`SUIT_TRACK_TOOLS` 表(room-logic.mjs,给 hero/skill/verb/once/allDone 文案)+ `initToolState={round,used:{S,H,C,D},once,log}` + 动作 `stToggle{suit}`(勾/取消,取消=纠错)/ `stOnce`(仅配置了 once 的,谋小乔「绝颜每轮限一次」)/ `newRound`(四花色重开,round+1)/ `resetGame`;客户端 `SUIT_UI` 表 + `viewSuitTool/bindSuit`(四花色大按钮,用过划掉变灰;荀采四花色齐亮「摸一张」)。全公开、worker 零改;三将 tool 直写 generals.json + TOOL_NAMES。**再加同类武将 = 两张表各加一行 + generals.json 挂 tool + room.html 三注册**。
+**⭐ 2026-10-17 续:花色台账扫全库 +3 将;OL 孙寒华手录(库 **711**,**32 工具**,待 deploy)**:
+- **扫描口径**:技能文本匹配「每轮/每回合 … 花色 … 首次/限一次/每种花色」。命中且适合台账的只有 **晋司马懿·权变**(出牌阶段首次用/打出一种花色)、**司马昭·昭然**(本阶段每种花色限一次)、**界吕蒙·博图**(本回合弃牌堆含四种花色 → 额外回合)——三者按「回合/出牌阶段」重开而不是「轮」,`SUIT_TRACK_TOOLS` 加了 `period` 字段(只影响文案,reducer 同一套)。其余命中(周瑜反间/神吕蒙涉猎/神甘宁魄袭/卞夫人约俭/蒋干盗书/谋戏志才金烬)是一次性选花色或凑花色,不需要跨回合台账,没做。
+- **OL 孙寒华 = 9027**(olwiki 774,品质「未标注」=测试版,用户已买实体卡;quality 写「测试版」+ cardWarn):华光 + 玄白;**衍生牌【彩莲】** 在 `derived-cards-room.json`(src 写「衍生牌·置入任一装备栏」,build-equipment 自动跳过,不进装备库)、**衍生技 荡魔/济惠/霞举 + 形态说明** 在 `derived-skills-room.json`;皮肤只有经典 77400(alias 9027→774);性别女;包 璀璨星河-少微。graduate 候选 +1(→774)。
+- **线下版 9001 改名「线下孙寒华」**,`heroBaseName` 前缀集加「线下」(deal.mjs + room.html 同步)→ 两个孙寒华同名可替换、发将同一个坑;derived-cards-room 的键跟着改成「线下孙寒华」(刺【杀】)。
+
+(现 **29 工具**,待 deploy)**:谋小乔·绝颜(`mouxiaoqiao`)/ 族荀采·点盏(`zuxuncai`)/ 谋董卓·封赏(`moudongzhuo`)三将共用一套 reducer:`SUIT_TRACK_TOOLS` 表(room-logic.mjs,给 hero/skill/verb/once/allDone 文案)+ `initToolState={round,used:{S,H,C,D},once,log}` + 动作 `stToggle{suit}`(勾/取消,取消=纠错)/ `stOnce`(仅配置了 once 的,谋小乔「绝颜每轮限一次」)/ `newRound`(四花色重开,round+1)/ `resetGame`;客户端 `SUIT_UI` 表 + `viewSuitTool/bindSuit`(四花色大按钮,用过划掉变灰;荀采四花色齐亮「摸一张」)。全公开、worker 零改;三将 tool 直写 generals.json + TOOL_NAMES。**再加同类武将 = 两张表各加一行 + generals.json 挂 tool + room.html 三注册**。
 
 **⭐ 2026-10-17 发将两个开关:本局临时 ban + 排除今日已登场(待 deploy;room-sim **761**)**
 - **临时 ban 池** = `/pool` 页第三个页签(`pools[key].temp`,SgsConfigDO 存;该环境为空沿用军争,同白名单规则)。发将设置勾「本局临时 ban」→ worker 取 临时 ban 池 ∩ 本局将池 作候选 → `core.dealStart(…,{tempBan})` 进 **ban 阶段**(`deal.phase="ban"`,`deal.ban={k,cands,picked}`,`deal.prep` 存着发手牌要用的全部参数):每人 k=min(5, floor(候选÷人数)) 个候选(互不重复),**k<3 → `TEMPBAN_TOO_SMALL`,发将不开始**;各人 `dealBan{seatNo,heroId}` ban 一个(只 ban 该版本,`dropIdsFromPools` 按 id 剔、整坑空才删、专属君主被剔则 forced=null;ban 结果立即公开,不可改);全员 ban 完 → `_dealHands(prep, banned)` 发手牌进 pick 阶段。ban 阶段 dealPick/dealSwap/dealReveal 全拒 `BAN_PHASE`;可中止。候选只给本人(`banCands`),旁人只见「待 ban / ban 了谁」。
@@ -124,7 +129,7 @@
 - **测试版房规(2026-10-17,用户说后续可能改回)**:族荀淑「八龙」摸至与存活角色数相同 → **固定摸至 8 张**(`SKILL_OVERRIDES[522]` + cardWarn 标「测试版房规」;改回=删那条再 rebake)。`_dealView` 现带 `phase/banK/banned/excluded`;老存档无 phase 当 pick。
 - 评估(给用户的):临时 ban 合理;「今日已登场」作为可选开关可以,但多局之后池子会明显缩水(军争池 ~190 将,8 人局每局用掉 8 个,第 4 局后 6 坑×8 人=48 坑仍够,但同名坑合并后可能吃紧),所以做成默认关 + 不够发时报错而不是悄悄放宽。
 
-**⭐ 2026-10-16 新将核对 + graduate 四将 + 录 谋田丰(库 **710**,待 deploy)**:官网花名册 692→**696**,新增的正是手录的 679逢纪/769谢灵毓/770谋周瑜/748族荀灌 → 已 graduate(删 OFFLINE_HEROES 9022-9025 + `scrape-generals.mjs --ids 679,769,770,748`;`xielingyu` 工具由 TOOL_NAMES 接到 769;官网「元嫡」{0} 占位 → `SKILL_OVERRIDES[769]` 补成【杀】【闪】【桃】;hero-packs/hero-skins(删 alias)/hero-gender/hero-pool-seed/room.html `GRADUATED` 全部换成新 id;**线上 /api/pool 白名单里的旧 id 已用 PUT 换成新 id**)。**谋田丰** = olwiki 659(传说/群/3血/谋-计出万全,执谏+效竭),官网未收录 → 手录 **9026**(皮肤 alias→659 已抓 6 张,性别男已核,拼音已建);graduate 候选现 **4 个**:9009界关平→766 / 9018界钟会→758 / 9001孙寒华(线下版,不毕业)/ **9026谋田丰→659**。olwiki 其余库里没有的(杨奉/谋郭嘉/族荀爽/界朱桓/谋孟获/谋李傕…)品质仍「未标注」=未上线,不录。**核对口径**:olwiki 条目带品质(非"未标注")且库里没有 = 新上线将。
+**⭐ 2026-10-16 新将核对 + graduate 四将 + 录 谋田丰(库 **710**,待 deploy)**:官网花名册 692→**696**,新增的正是手录的 679逢纪/769谢灵毓/770谋周瑜/748族荀灌 → 已 graduate(删 OFFLINE_HEROES 9022-9025 + `scrape-generals.mjs --ids 679,769,770,748`;`xielingyu` 工具由 TOOL_NAMES 接到 769;官网「元嫡」{0} 占位 → `SKILL_OVERRIDES[769]` 补成【杀】【闪】【桃】;hero-packs/hero-skins(删 alias)/hero-gender/hero-pool-seed/room.html `GRADUATED` 全部换成新 id;**线上 /api/pool 白名单里的旧 id 已用 PUT 换成新 id**)。**谋田丰** = olwiki 659(传说/群/3血/谋-计出万全,执谏+效竭),官网未收录 → 手录 **9026**(皮肤 alias→659 已抓 6 张,性别男已核,拼音已建);graduate 候选现 **4 个**:9009界关平→766 / 9018界钟会→758 / 9026谋田丰→659 / **9027孙寒华→774**(9001 线下孙寒华永久 offline)。olwiki 其余库里没有的(杨奉/谋郭嘉/族荀爽/界朱桓/谋孟获/谋李傕…)品质仍「未标注」=未上线,不录。**核对口径**:olwiki 条目带品质(非"未标注")且库里没有 = 新上线将。
 
 **⭐ 2026-10-10 小伙伴四需求(全部做完,待 deploy;room-sim **747**,现 **26 工具**)**:
 - **神张角「异兆」计数器**(tool `shenzhangjiao`,227 直写 generals.json + TOOL_NAMES;全公开生成器范式,worker 零改):toolState `{huang,lastDraw,hist,log}`;`yzAdd{rank 1..13}` 加「黄」并判十位数是否改变(改变=摸一张,`lastDraw`)/ `yzUndo` 撤销上一张 / `yzSet{n}` 手动校正 / `sjClear` 肆军弃置所有黄 / `resetGame`。UI 13 个点数键 + 大字计数 + 「再加 N 点就进位」。

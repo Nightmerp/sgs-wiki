@@ -4733,7 +4733,7 @@
     "characteristic": "能够积累大量的手牌，觉醒后能够观看并破坏敌人的手牌。囤积大量手牌后可以达成可怕的连续行动",
     "cover": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/xingxiang/30600.png",
     "avatar": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/dianjiang/30600.png",
-    "tool": null,
+    "tool": "jielvmeng",
     "offline": false
   },
   {
@@ -20080,7 +20080,7 @@
     "characteristic": "牌堆掌控合理，回合内爆发力极强。",
     "cover": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/xingxiang/700300.png",
     "avatar": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/dianjiang/700300.png",
-    "tool": null,
+    "tool": "jinsimayi",
     "offline": false
   },
   {
@@ -20119,7 +20119,7 @@
     "characteristic": "以暴露手牌信息的前提下获得爆发能力。",
     "cover": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/xingxiang/700400.png",
     "avatar": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/dianjiang/700400.png",
-    "tool": null,
+    "tool": "simazhao",
     "offline": false
   },
   {
@@ -21097,7 +21097,7 @@
   },
   {
     "id": 9001,
-    "name": "孙寒华",
+    "name": "线下孙寒华",
     "genre": "线下",
     "series": "线下",
     "faction": "吴",
@@ -21550,6 +21550,37 @@
     "characteristic": "能够转化锦囊牌，对同目标连续发动技能收益较高。",
     "cover": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/big/static/65900.png",
     "avatar": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/skinShop/65900.png",
+    "tool": null,
+    "offline": true
+  },
+  {
+    "id": 9027,
+    "name": "孙寒华",
+    "genre": "璀璨星河",
+    "series": "标",
+    "faction": "吴",
+    "factionSelectable": false,
+    "quality": "测试版",
+    "hp": 3,
+    "initialHp": null,
+    "tags": [
+      "形态切换",
+      "过牌"
+    ],
+    "skills": [
+      {
+        "name": "华光",
+        "effect": "每轮开始时、准备阶段，你可选择：1.将【彩莲】置入一个装备栏；2.修改【彩莲】花色。"
+      },
+      {
+        "name": "玄白",
+        "effect": "锁定技，当【彩莲】进入你的一个装备栏后，你切换为不同的形态：武器栏—荡魔；防具栏—济惠；宝物栏—霞举。"
+      }
+    ],
+    "characteristic": "将彩莲置入不同的装备栏切换形态获得更高收益。",
+    "cardWarn": "OL 测试版武将(olwiki 品质未标注),技能文本以本房间为准;正式版若有改动再同步",
+    "cover": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/big/static/77400.png",
+    "avatar": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/general/skinShop/77400.png",
     "tool": null,
     "offline": true
   }
