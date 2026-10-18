@@ -401,6 +401,8 @@ export function initToolState(generalId) {
     return { records: { S: null, H: null, C: null, D: null }, log: [] }; // 拾昔:每花色首张单目标普通锦囊的牌名(全公开,整局有效)
   if (generalId === "mouchengyu")
     return { pending: null, choice: {}, settle: null, log: [] }; // 胆持:pending={targetSeat,sourceSeat|null,revealed};choice={}|{c}(保密,见 VISIBILITY);settle={actual,diff}(公开)
+  if (generalId === "zhouqun")
+    return { suit: null, holder: null, log: [] }; // 天候:suit=当前生效天气的花色(H烈暑/D凝雾/S骤雨/C严霜),holder=拥有该技能的座位;到周群下一准备阶段清掉
   if (generalId === "mengda")
     return { switches: 0, log: [] }; // 苟得·变更势力:实际势力写在 seat.chosenFaction(公开,全场面板/距离/查将都按它),这里只记次数与日志
   if (generalId === "xizhicai")
@@ -474,7 +476,7 @@ export class RoomCore extends RoomBase {
   // 装备区5槽(weapon/armor/atkHorse(-1马)/defHorse(+1马)/treasure)=各 {name,suit,rank,type,range?} 或 null;
   // abolished={槽名:true} 废除的槽(张绣/刘宏等);lordBonus=主公/地主/主帅 +1 体力上限
   _newSeat(i) {
-    return { seatNo: i, general: null, chosenFaction: null, skin: null, genLocked: false, holderDevices: [], toolState: {}, // genLocked:线上发将亮出的武将不可再手动改(新一局/重新发将才解)
+    return { seatNo: i, general: null, chosenFaction: null, skin: null, genLocked: false, hidden: false, holderDevices: [], toolState: {}, // hidden:隐匿武将未登场(别人只见「隐匿」,体力 1) // genLocked:线上发将亮出的武将不可再手动改(新一局/重新发将才解)
       hp: null, hpMax: null, flipped: false, chained: false, dead: false, lordBonus: false,
       weapon: null, armor: null, atkHorse: null, defHorse: null, treasure: null, abolished: {},
       judgments: [] }; // 判定区:乐不思蜀/兵粮寸断/闪电 种类列表(同名不叠;只记种类不记花色点数)
@@ -505,18 +507,21 @@ export class RoomCore extends RoomBase {
     const over = this.ident && this.ident.over;
     return { id: this.game.id, t0: this.game.t0, t: Date.now(), room: this.roomCode,
       mode: this.ident ? (IDENT_MODES[this.ident.mode]?.label || this.ident.mode) : null,
-      seats: seats.map((s) => ({ n: s.seatNo, player: s.holderDevices[0] || null, general: s.general ? (heroInfo(s.general)?.name || s.general) : null,
+      seats: seats.map((s) => ({ n: s.seatNo, player: s.holderDevices[0] || null, general: s.general ? (s.hidden ? "隐匿武将" : (heroInfo(s.general)?.name || s.general)) : null, // 隐匿未登场不进历史(历史实时可读)
         role: over && this.ident.roles[s.seatNo] ? (this.ident.roles[s.seatNo].title || this.ident.roles[s.seatNo].role) : null })) };
   }
   _applyGeneral(n, g, locked = false) {
     if (g && !this.game) this._newGame(); // 手动选将开局:首次有人落座即算一局开始
-    this.seats[n].general = g; this.seats[n].toolState = g ? initToolState(g) : {};
+    this.seats[n].general = g;
+    this.seats[n].toolState = g ? initToolState(g) : {};
+    this.seats[n].hidden = !!(g && heroInfo(g)?.yinni); // 带隐匿技的武将:落座即隐匿(用户 2026-10-18),登场见 revealHidden
     this.seats[n].genLocked = !!locked;
     this.seats[n].skin = null;          // 改武将→皮肤回默认立绘
     this.seats[n].chosenFaction = null; // 改武将→清掉旧的自选势力(神将换将或换成非神将都该重置)
     // 换武将→重置全场面板状态。血量置 null,由客户端按新武将体力上限重新播种(panelSetHpMax)
     const ps = this.seats[n];
     ps.hp = null; ps.hpMax = null; ps.flipped = false; ps.chained = false; ps.dead = false; ps.lordBonus = false;
+    if (ps.hidden) { ps.hp = 1; ps.hpMax = 1; } // 隐匿状态:体力 1(客户端不再按武将上限播种)
     ps.weapon = null; ps.armor = null; ps.atkHorse = null; ps.defHorse = null; ps.treasure = null; ps.abolished = {}; ps.judgments = [];
   }
 
@@ -909,7 +914,7 @@ export class RoomCore extends RoomBase {
       const mine = holds.has(Number(n));
       seats[n] = { picked: !!hand.pick, final: !!(hand.pick && hand.pick.final), slotCount: hand.slots.length };
       if (mine) { seats[n].slots = clone(hand.slots); seats[n].pick = hand.pick ? clone(hand.pick) : null; }
-      else if (hand.pick && hand.pick.final) seats[n].pick = { heroId: hand.pick.heroId, name: hand.pick.name, final: true }; // 君主已亮出
+      else if (hand.pick && hand.pick.final) seats[n].pick = this.seats[n].hidden ? { heroId: null, name: "隐匿武将", final: true } : { heroId: hand.pick.heroId, name: hand.pick.name, final: true }; // 君主已亮出(隐匿武将不露名)
     }
     return { phase: d.phase || "pick", mode: d.mode, lordSeat: d.lordSeat,
       call: d.call ? { cand: d.call.cand, order: d.call.order, passed: d.call.passed, done: !!d.call.done, landlord: d.call.landlord ?? null, forced: !!d.call.forced } : null, firstSeats: d.firstSeats ?? (d.lordSeat != null ? [d.lordSeat] : []), lordTitle: d.lordTitle ?? null, lordPicked: d.lordPicked, seats, picked, total, poolLeft: d.pool.length, poolKey: d.poolKey ?? null, poolLabel: d.poolLabel ?? null,
@@ -924,6 +929,16 @@ export class RoomCore extends RoomBase {
     if (skinId != null && !(Number.isInteger(skinId) && skinId > 0 && skinId < 1e8)) return { error: "BAD_SKIN" };
     this.seats[n].skin = skinId ?? null;
     return { ok: true };
+  }
+  // 隐匿武将登场(持有者点;首次受伤或自己回合开始时):亮明武将,体力上限/体力回到武将数值(受伤登场的那 1 点伤害之后再手动扣)
+  revealHidden(id, n) {
+    n = Number(n);
+    if (!this.devices[id]?.holds.has(n)) return { error: "NOT_HOLDER" };
+    const s = this.seats[n]; if (!s || !s.hidden) return { error: "NOT_HIDDEN" };
+    s.hidden = false;
+    const hp = Number(heroInfo(s.general)?.hp);
+    if (Number.isFinite(hp) && hp > 0) { s.hpMax = hp; s.hp = hp; }
+    return { ok: true, hp: s.hp };
   }
   // 神将自选势力(公开;RoomCore 不判是否神将,客户端只对 factionSelectable 的武将露出选择器)
   setFaction(id, n, faction) {
@@ -1247,6 +1262,24 @@ export class RoomCore extends RoomBase {
 
     // ───────── 贾充:凶竖(秘密猜测)。发动=展示目标一张手牌(公开)+ 秘密猜"此阶段是否使用同名牌";
     // 猜测锁定不可改、仅贾充可见(VISIBILITY.guess=ownerSeatOnly);阶段结束点揭晓→公开猜测+实际+对错 ─────────
+    // ───────── 周群:天候 当前天气台账(全公开)。准备阶段展示牌堆顶 → 按花色令一名角色获得天气技能直到周群下一准备阶段 ─────────
+    if (target.general === "zhouqun") {
+      const zSeat = targetSeat, isZq = bySeat === zSeat && iHold(zSeat);
+      const WX = { H: "烈暑", D: "凝雾", S: "骤雨", C: "严霜" }, SC = { H: "红桃", D: "方片", S: "黑桃", C: "梅花" };
+      if (t === "zqSet") { // {suit, targetSeat}
+        if (!isZq) return { error: "NOT_ZQ_ACTION" };
+        const su = String(toolAction.suit), tg = Number(toolAction.targetSeat);
+        if (!WX[su]) return { error: "BAD_SUIT" };
+        if (!this.seats[tg]) return { error: "BAD_SEAT" };
+        ts.suit = su; ts.holder = tg;
+        this._log(ts, `天候:${SC[su]} → 座位 ${tg} 获得〖${WX[su]}〗(至周群下一准备阶段)`);
+        return { ok: true };
+      }
+      if (t === "zqClear") { if (!isZq) return { error: "NOT_ZQ_ACTION" }; ts.suit = null; ts.holder = null; this._log(ts, "天候:天气结束(周群准备阶段)"); return { ok: true }; }
+      if (t === "resetGame") { if (!isZq) return { error: "NOT_ZQ_ACTION" }; target.toolState = initToolState(target.general); return { ok: true, reset: true }; }
+      return { error: "UNKNOWN_ACTION" };
+    }
+
     // ───────── 孟达:苟得「变更势力」。在 app 里切换当前势力(seat.chosenFaction;null=回本势力蜀),全公开 ─────────
     if (target.general === "mengda") {
       const mSeat = targetSeat, isMd = bySeat === mSeat && iHold(mSeat);
@@ -2627,7 +2660,11 @@ export class RoomCore extends RoomBase {
   }
 
   _seatView(s, holds) {
-    return { seatNo: s.seatNo, general: s.general, chosenFaction: s.chosenFaction ?? null, skin: s.skin ?? null, genLocked: !!s.genLocked, holderDevices: s.holderDevices.slice(), toolState: filterState(s, holds),
+    if (s.hidden && !holds.has(s.seatNo)) // 隐匿未登场:别人只知道「这里有个隐匿武将」,武将/势力/皮肤/工具全藏
+      return { seatNo: s.seatNo, general: "hidden", hidden: true, chosenFaction: null, skin: null, genLocked: !!s.genLocked, holderDevices: s.holderDevices.slice(), toolState: {},
+        hp: s.hp ?? 1, hpMax: s.hpMax ?? 1, flipped: !!s.flipped, chained: !!s.chained, dead: !!s.dead, lordBonus: !!s.lordBonus,
+        weapon: s.weapon ?? null, armor: s.armor ?? null, atkHorse: s.atkHorse ?? null, defHorse: s.defHorse ?? null, treasure: s.treasure ?? null, abolished: s.abolished ?? {}, judgments: s.judgments ?? [] };
+    return { seatNo: s.seatNo, general: s.general, hidden: !!s.hidden, chosenFaction: s.chosenFaction ?? null, skin: s.skin ?? null, genLocked: !!s.genLocked, holderDevices: s.holderDevices.slice(), toolState: filterState(s, holds),
       // 全场状态面板字段(全公开;老房间 hydrate 无这些字段→?? 兜底为 null/false)
       hp: s.hp ?? null, hpMax: s.hpMax ?? null, flipped: !!s.flipped, chained: !!s.chained, dead: !!s.dead, lordBonus: !!s.lordBonus,
       weapon: s.weapon ?? null, armor: s.armor ?? null, atkHorse: s.atkHorse ?? null, defHorse: s.defHorse ?? null, treasure: s.treasure ?? null, abolished: s.abolished ?? {},

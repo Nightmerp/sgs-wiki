@@ -11854,7 +11854,7 @@
     "characteristic": "能感应天气变化，使战局风云莫测。",
     "cover": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/xingxiang/54300.png",
     "avatar": "https://web.sanguosha.com/220/h5_2/res/runtime/pc/activity/shequshow/dianjiang/54300.png",
-    "tool": null,
+    "tool": "zhouqun",
     "offline": false
   },
   {
@@ -14527,8 +14527,8 @@
     ],
     "skills": [
       {
-        "name": "技能",
-        "effect": ""
+        "name": "贤膺",
+        "effect": "准备阶段或当你受到伤害后，你可以摸两张牌并弃置任意张牌（不能是本轮以此法弃置过的张数），若弃置牌同名，你可以于本回合结束时视为使用之。"
       }
     ],
     "characteristic": "要仔细计算技能中摸牌和弃牌的质与量。",

@@ -49,7 +49,8 @@ async function getConfig(env) {
 
 // 武将基本信息喂给 RoomCore(key 同 setGeneral 的 generalId:有工具→工具名,否则 String(id))
 const FEMALE_IDS = new Set(GENDER_DATA.female);
-setHeroInfo(Object.fromEntries(GENERALS_DATA.map((h) => [h.tool || String(h.id), { name: h.name, hp: h.hp, female: FEMALE_IDS.has(h.id) }])));
+setHeroInfo(Object.fromEntries(GENERALS_DATA.map((h) => [h.tool || String(h.id), { name: h.name, hp: h.hp, female: FEMALE_IDS.has(h.id),
+  yinni: (h.skills || []).some((s) => /^隐匿/.test(s.effect || "")) }]))); // yinni=带隐匿技(技能文本以「隐匿」开头;曹爽托孤只是提到隐匿,不算)
 
 const SEAT_COUNT = 8; // 三国杀常见 2~8 人;先固定 8,后续可由开房参数决定
 // 一次序列化,静态资源直接吐;顺带贴拼音(py:"guan yu")。GENERALS_DATA 本身不改(禁将池等仍按原数据查)
@@ -234,6 +235,7 @@ export class RoomDO extends RoomDOBase {
       case "setGeneral": return core.setGeneral(id, msg.seatNo, msg.generalId);      // 别静默吞错(否则"工具没变"却无提示)
       case "setSkin": return core.setSkin(id, msg.seatNo, msg.skinId ?? null);          // 立绘皮肤(公开)
       case "setFaction": return core.setFaction(id, msg.seatNo, msg.faction);        // 神将自选势力
+      case "revealHidden": return core.revealHidden(id, msg.seatNo);                 // 隐匿武将登场
       // ── 线上发将 ──
       case "dealStart": return this.dealStart(id, msg, core);                        // async:先读全局将池白名单
       case "dealBan": return core.dealBan(id, msg);

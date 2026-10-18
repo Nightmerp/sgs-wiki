@@ -798,6 +798,41 @@ console.log("\n=== 场景 15c3:孟达 变更势力 ===");
   check("换将重置势力", act(1, { type: "mdFaction", faction: "吴" }).ok && rm.setGeneral(d[1], 1, "lvbu").ok && rm.seats[1].chosenFaction === null);
 }
 
+// ============ 场景 15c4:周群 天候 + 隐匿武将登场 ============
+console.log("\n=== 场景 15c4:周群 天候 / 隐匿登场 ===");
+{
+  const rm = new RoomCore("3586", 3, () => 0);
+  const d = {}; for (let i = 1; i <= 3; i++) { d[i] = `zq${i}`; rm.claimSeat(d[i], i); }
+  rm.setGeneral(d[1], 1, "zhouqun");
+  const act = (by, o) => rm.action(d[by], { targetSeat: 1, bySeat: by, toolAction: o });
+  check("天候:非本人拒;坏花色/坏座位拒", act(2, { type: "zqSet", suit: "H", targetSeat: 2 }).error === "NOT_ZQ_ACTION" && act(1, { type: "zqSet", suit: "X", targetSeat: 2 }).error === "BAD_SUIT" && act(1, { type: "zqSet", suit: "H", targetSeat: 9 }).error === "BAD_SEAT");
+  check("⭐ 天候:红桃 → 座位 2 得烈暑,全场可见", act(1, { type: "zqSet", suit: "H", targetSeat: 2 }).ok && rm.viewFor(d[3]).seats[1].toolState.suit === "H" && rm.viewFor(d[3]).seats[1].toolState.holder === 2 && rm.seats[1].toolState.log[0].includes("烈暑"));
+  check("天候:改成黑桃 → 座位 1 自己", act(1, { type: "zqSet", suit: "S", targetSeat: 1 }).ok && rm.seats[1].toolState.suit === "S" && rm.seats[1].toolState.holder === 1);
+  check("天候:清除", act(1, { type: "zqClear" }).ok && rm.seats[1].toolState.suit === null && rm.seats[1].toolState.holder === null);
+}
+{
+  const { setHeroInfo } = await import("./shared/room-logic.mjs");
+  setHeroInfo({ "358": { name: "宣公主", hp: 3, female: true, yinni: true }, "7003": { name: "晋司马懿", hp: 3, female: false, yinni: true }, lvbu: { name: "魔吕布", hp: 4, female: false, yinni: false } });
+  const rm = new RoomCore("3587", 3, () => 0);
+  const d = {}; for (let i = 1; i <= 3; i++) { d[i] = `yn${i}`; rm.claimSeat(d[i], i); }
+  rm.setGeneral(d[1], 1, "358"); rm.setGeneral(d[2], 2, "lvbu");
+  const v = (n) => rm.viewFor(d[n]).seats[1];
+  check("⭐ 带隐匿技的武将落座即隐匿:体力 1/1;本人见真名,别人只见 hidden", rm.seats[1].hidden && rm.seats[1].hp === 1 && rm.seats[1].hpMax === 1 && v(1).general === "358" && v(1).hidden === true && v(2).general === "hidden" && v(2).hidden === true && v(2).hpMax === 1 && !JSON.stringify(v(2)).includes("358"));
+  check("不带隐匿技的武将照旧", !rm.seats[2].hidden && rm.viewFor(d[1]).seats[2].general === "lvbu" && rm.seats[2].hp === null);
+  check("历史记录里隐匿武将不露名", rm.gameRecord().seats[0].general === "隐匿武将" && rm.gameRecord().seats[1].general === "魔吕布");
+  check("别人不能替他登场;没隐匿的座位 → NOT_HIDDEN", rm.revealHidden(d[2], 1).error === "NOT_HOLDER" && rm.revealHidden(d[2], 2).error === "NOT_HIDDEN");
+  check("⭐ 登场:亮明武将,体力回到 3/3,全场可见", rm.revealHidden(d[1], 1).hp === 3 && !rm.seats[1].hidden && rm.seats[1].hpMax === 3 && v(2).general === "358" && v(2).hidden === false);
+  check("换将重置隐匿;序列化存活", rm.setGeneral(d[1], 1, "7003").ok && rm.seats[1].hidden && RoomCore.hydrate(JSON.parse(JSON.stringify(rm.serialize()))).seats[1].hidden === true);
+  // 发将:君主先亮出隐匿武将 → 别人在发将视图里也只见「隐匿武将」
+  const g = (k, id) => ({ key: k, opts: [{ id, name: k, gid: String(id), lord: false }] });
+  const rm2 = new RoomCore("3588", 3, () => 0); for (let i = 1; i <= 3; i++) rm2.claimSeat("yd" + i, i);
+  rm2.dealStart("yd1", { mode: "normal", lordSeat: 1, pools: { normal: Array.from({ length: 20 }, (_, i) => g("将" + i, 100 + i)), lord: [g("宣公主", 358)], forced: null } });
+  const li = rm2.deal.hands[1].slots.findIndex((x) => x.src === "lord");
+  rm2.dealPick("yd1", { seatNo: 1, slot: li, heroId: 358 });
+  check("⭐ 君主亮出的是隐匿武将:座位隐匿,发将视图里别人只见「隐匿武将」,自己见真名", rm2.seats[1].hidden && rm2.viewFor("yd2").deal.seats[1].pick.name === "隐匿武将" && rm2.viewFor("yd2").deal.seats[1].pick.heroId === null && rm2.viewFor("yd1").deal.seats[1].pick.name === "宣公主");
+  setHeroInfo({});
+}
+
 // ============ 场景 15d:贾充 凶竖(秘密猜测 + 保密投影 + 揭晓)============
 console.log("\n=== 场景 15d:贾充 凶竖 ===");
 const roomJ = new RoomCore("6420", 4, () => 0);

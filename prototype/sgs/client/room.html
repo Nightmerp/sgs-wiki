@@ -259,8 +259,8 @@ const lbManual=new Set(); // 吕布登记:哪些槽位(seat:ci)切到"手填牌�
 const draft={}; // seat -> [{s,r,n}]  登记草稿
 
 /* ============ 武将 / 工具注册表 ============ */
-const GENERALS={ lvbu:{name:"魔吕布"}, nanhua:{name:"南华老仙"}, xunyou:{name:"族荀攸"}, huangyueying:{name:"谋黄月英"}, caocao:{name:"魔曹操"}, yuanji:{name:"袁姬"}, zhongyan:{name:"钟琰"}, simayi:{name:"魔司马懿"}, dongzhao:{name:"谋董昭"}, shensunquan:{name:"神孙权"}, diaochan:{name:"魔貂蝉"}, sunquan:{name:"魔孙权"}, dianwei:{name:"神典韦"}, lijue:{name:"李傕"}, xurong:{name:"徐荣"}, xushi:{name:"SP徐氏"}, guozhao:{name:"郭照"}, peixiu:{name:"裴秀"}, puyuan:{name:"蒲元"}, caoying:{name:"曹婴"}, wangmingshan:{name:"族王明山"}, jiachong:{name:"贾充"}, zuluyusheng:{name:"族陆郁生"}, mouchengyu:{name:"谋程昱"}, shenzhangjiao:{name:"神张角"}, xielingyu:{name:"谢灵毓"}, mouxiaoqiao:{name:"谋小乔"}, zuxuncai:{name:"族荀采"}, moudongzhuo:{name:"谋董卓"}, jinsimayi:{name:"晋司马懿"}, simazhao:{name:"司马昭"}, jielvmeng:{name:"界吕蒙"}, xizhicai:{name:"戏志才"}, mengda:{name:"孟达"} };
-const hasTool=g=>g==="lvbu"||g==="nanhua"||g==="xunyou"||g==="huangyueying"||g==="caocao"||g==="yuanji"||g==="zhongyan"||g==="simayi"||g==="dongzhao"||g==="shensunquan"||g==="diaochan"||g==="sunquan"||g==="dianwei"||g==="lijue"||g==="xurong"||g==="xushi"||g==="guozhao"||g==="peixiu"||g==="puyuan"||g==="caoying"||g==="wangmingshan"||g==="jiachong"||g==="zuluyusheng"||g==="mouchengyu"||g==="shenzhangjiao"||g==="xielingyu"||g==="mouxiaoqiao"||g==="zuxuncai"||g==="moudongzhuo"||g==="jinsimayi"||g==="simazhao"||g==="jielvmeng"||g==="xizhicai"||g==="mengda";
+const GENERALS={ lvbu:{name:"魔吕布"}, nanhua:{name:"南华老仙"}, xunyou:{name:"族荀攸"}, huangyueying:{name:"谋黄月英"}, caocao:{name:"魔曹操"}, yuanji:{name:"袁姬"}, zhongyan:{name:"钟琰"}, simayi:{name:"魔司马懿"}, dongzhao:{name:"谋董昭"}, shensunquan:{name:"神孙权"}, diaochan:{name:"魔貂蝉"}, sunquan:{name:"魔孙权"}, dianwei:{name:"神典韦"}, lijue:{name:"李傕"}, xurong:{name:"徐荣"}, xushi:{name:"SP徐氏"}, guozhao:{name:"郭照"}, peixiu:{name:"裴秀"}, puyuan:{name:"蒲元"}, caoying:{name:"曹婴"}, wangmingshan:{name:"族王明山"}, jiachong:{name:"贾充"}, zuluyusheng:{name:"族陆郁生"}, mouchengyu:{name:"谋程昱"}, shenzhangjiao:{name:"神张角"}, xielingyu:{name:"谢灵毓"}, mouxiaoqiao:{name:"谋小乔"}, zuxuncai:{name:"族荀采"}, moudongzhuo:{name:"谋董卓"}, jinsimayi:{name:"晋司马懿"}, simazhao:{name:"司马昭"}, jielvmeng:{name:"界吕蒙"}, xizhicai:{name:"戏志才"}, mengda:{name:"孟达"}, zhouqun:{name:"周群"} };
+const hasTool=g=>g==="lvbu"||g==="nanhua"||g==="xunyou"||g==="huangyueying"||g==="caocao"||g==="yuanji"||g==="zhongyan"||g==="simayi"||g==="dongzhao"||g==="shensunquan"||g==="diaochan"||g==="sunquan"||g==="dianwei"||g==="lijue"||g==="xurong"||g==="xushi"||g==="guozhao"||g==="peixiu"||g==="puyuan"||g==="caoying"||g==="wangmingshan"||g==="jiachong"||g==="zuluyusheng"||g==="mouchengyu"||g==="shenzhangjiao"||g==="xielingyu"||g==="mouxiaoqiao"||g==="zuxuncai"||g==="moudongzhuo"||g==="jinsimayi"||g==="simazhao"||g==="jielvmeng"||g==="xizhicai"||g==="mengda"||g==="zhouqun";
 // 每个工具:view(seat)->HTML,bind(seat,q)->挂事件。TOOLS 在下方函数声明后其引用已 hoist。
 const TOOLS={ lvbu:{view:s=>viewLvbuTool(s),bind:(s,q)=>bindLvbu(s,q)},
              nanhua:{view:s=>viewNanhuaTool(s),bind:(s,q)=>bindNanhua(s,q)},
@@ -291,6 +291,7 @@ const TOOLS={ lvbu:{view:s=>viewLvbuTool(s),bind:(s,q)=>bindLvbu(s,q)},
              jielvmeng:{view:s=>viewSuitTool(s),bind:(s,q)=>bindSuit(s,q)},
              xizhicai:{view:s=>viewXzTool(s),bind:(s,q)=>bindXz(s,q)},
              mengda:{view:s=>viewMdTool(s),bind:(s,q)=>bindMd(s,q)},
+             zhouqun:{view:s=>viewZqTool(s),bind:(s,q)=>bindZq(s,q)},
              xurong:{view:s=>viewXrTool(s),bind:(s,q)=>bindXr(s,q)},
              xushi:{view:s=>viewXsTool(s),bind:(s,q)=>bindXs(s,q)},
              guozhao:{view:s=>viewGzTool(s),bind:(s,q)=>bindGz(s,q)},
@@ -384,6 +385,7 @@ function heroForSeat(general){
 }
 function seatGeneralName(general){
   if(!general||general==="none")return "";
+  if(general==="hidden")return "隐匿武将"; // 别人视角:隐匿未登场
   if(hasTool(general))return GENERALS[general]?.name||general;
   const h=heroForSeat(general);return h?h.name:general;
 }
@@ -587,7 +589,7 @@ const RC=RoomClient.create({
     DEAL_ACTIVE:"已有发将在进行中",POOL_NOT_SET:"将池白名单还没设置(房间设置 → 将池编辑)",POOL_TOO_SMALL:"将池不够发:可发的坑数少于 人数×6",POOL_UNAVAILABLE:"读取将池失败,稍后再试",
     BAD_LORD:"君主座位必须是已入座的座位",NO_PLAYERS:"还没有人入座",LORD_FIRST:"等君主先选定并亮出",ALREADY_PICKED:"已选定并亮出,不能再改",CANT_SWAP:"这个坑不能换(已换过,或是君主候选)",
     POOL_EMPTY:"将池里没有可换的了",TEMPBAN_TOO_SMALL:"临时 ban 池太小:每人至少要 3 选 1(将池编辑 → 临时 ban 池 多勾一些)",TEMPBAN_EMPTY:"临时 ban 池里没有在本局将池里的武将(将池编辑 → 临时 ban 池)",
-    BAN_PHASE:"还在临时 ban 阶段,等全员 ban 完再选将",CALL_PHASE:"还在叫地主,等地主定了再选将/换将",NOT_CALL_PHASE:"不在叫地主阶段",NOT_YOUR_CALL:"还没轮到你叫",NOT_BAN_PHASE:"不在临时 ban 阶段",ALREADY_BANNED:"你已经 ban 过了",NOT_ALL_PICKED:"还有人没选定",NOT_IN_DEAL:"该座位不在本次发将里",BAD_PICK:"候选已变化,请重新选择",NO_DEAL:"发将已结束",
+    BAN_PHASE:"还在临时 ban 阶段,等全员 ban 完再选将",CALL_PHASE:"还在叫地主,等地主定了再选将/换将",NOT_CALL_PHASE:"不在叫地主阶段",NOT_YOUR_CALL:"还没轮到你叫",NOT_HIDDEN:"这个座位没有隐匿武将",NOT_BAN_PHASE:"不在临时 ban 阶段",ALREADY_BANNED:"你已经 ban 过了",NOT_ALL_PICKED:"还有人没选定",NOT_IN_DEAL:"该座位不在本次发将里",BAD_PICK:"候选已变化,请重新选择",NO_DEAL:"发将已结束",
     GENERAL_LOCKED:"线上发将选定的武将不能再改(要重来请重新发将,或在房间设置里点「新一局」)",
     COUNT_MISMATCH:"身份张数之和要等于入座人数",BAD_LEAD:"君主身份必须正好 1 张(明忠模式还要至少 1 名忠臣)",BAD_COUNTS:"身份张数填得不对",BAD_LOST:"失心张数不对",
     NO_DEFAULT:"这个人数没有默认配比,请在发身份设置里手填",NO_IDENT:"本局没有发身份",ALREADY_PEEKED:"明察整局只能看一次",NO_SKILL:"当前武将没有这个技能(或已经用完)",NO_GENERAL:"先选定武将",BAD_SKIN:"皮肤编号不对",ALREADY_USED:"蔽众整局只能发动一次",BAD_TARGET:"不能选这个座位"},
@@ -1127,8 +1129,10 @@ function viewSeats(){
     const nm=seatGeneralName(s.general);
     let label="";
     const chosen=s.chosenFaction||null;
-    if(hasTool(s.general)) label=`<span class="lb">${esc(nm)}</span>`;
+    if(s.general==="hidden") label=`<span class="kb" style="background:#2a241c;color:#f3ead8;border-color:#2a241c">🙈 隐匿 · 未登场</span>`;
+    else if(hasTool(s.general)) label=`<span class="lb">${esc(nm)}</span>`;
     else if(s.general&&s.general!=="none") label=`<span class="kb">${esc(nm)}</span>`;
+    if(s.hidden&&s.general!=="hidden") label+=`<span class="kb" style="background:#2a241c;color:#f3ead8;border-color:#2a241c">🙈 隐匿中(仅你可见)</span>`;
     if(hero){
       if(hero.factionSelectable) label+=`<span class="fc ${chosen?(FCLS[chosen]||'shen'):'shen'}">${chosen?"神→"+esc(chosen):"神·自选"}</span>`;
       else if(chosen&&chosen!==hero.faction) label+=`<span class="fc ${FCLS[chosen]||''}">${esc(hero.faction||"?")}→${esc(chosen)}</span>`; // 孟达苟得变更势力
@@ -1170,6 +1174,7 @@ function viewSeats(){
       // 发将中的参与座位:手动选武将入口换成发将弹层入口(防误点);已亮出(君主)则不再给入口
       // 线上发将亮出的武将锁定(genLocked):不再给手动改的入口;手动选将的座位保留下拉
       let ctl="";
+      if(s.hidden) ctl+=`<button class="primary" data-reveal="${s.seatNo}" style="font-size:13px">🙈 登场(亮明武将)</button><span class="hint" style="margin:0;flex:1 1 100%">别人只看到「隐匿武将」、体力 1。首次受伤或你的回合开始时点登场:体力回到上限,受伤登场的那 1 点伤害再手动扣,并可发动隐匿技。</span>`;
       if(ds){ if(deal.phase==="ban") ctl+=`<label style="font-size:12px;color:var(--ink-soft)">临时 ban</label><button class="${ds.picked?"":"primary"}" data-dealseat="${s.seatNo}" style="font-size:13px">${ds.picked?"已 ban · 看候选":ds.ban&&ds.ban.length?"还差 "+ds.banLeft+" 个 →":"去 ban "+(deal.banN||1)+" 个 →"}</button>`;
         else if(deal.phase==="call") ctl+=`<label style="font-size:12px;color:var(--ink-soft)">叫地主</label><button class="${deal.call.cand===s.seatNo?"primary":""}" data-dealseat="${s.seatNo}" style="font-size:13px">${deal.call.cand===s.seatNo?"轮到你:叫 / 不叫 →":"看牌(等叫地主)"}</button>`;
         else if(!ds.final) ctl+=`<label style="font-size:12px;color:var(--ink-soft)">发将</label><button class="${ds.picked?"":"primary"}" data-dealseat="${s.seatNo}" style="font-size:13px">${ds.picked?"已暗选 · 可改":"选将 →"}</button>`; }
@@ -1678,6 +1683,7 @@ function bindAll(){
   q("[data-history]").forEach(b=>b.onclick=()=>openHistory());
   q("[data-newgame]").forEach(b=>b.onclick=()=>{if(confirm("开新一局?\n全场武将(含线上发将锁定的)、身份、进行中的发将都会清空;座位和持有者不动。"))send({type:"newGame"});});
   // 身份:发放设置 / 我的身份 / 疑似身份标记 / 全部亮明 / 清除
+  q("[data-reveal]").forEach(b=>b.onclick=()=>{if(confirm("登场?亮明你的武将,体力回到武将上限(这次受到的伤害之后再手动扣)。"))send({type:"revealHidden",seatNo:+b.dataset.reveal});});
   q("[data-art]").forEach(b=>b.onclick=()=>openArt(+b.dataset.art)); // 立绘:点座位头像
   q("[data-identopen]").forEach(b=>b.onclick=()=>openIdentSetup());
   q("[data-myident]").forEach(b=>b.onclick=()=>openMyIdent(+b.dataset.myident));
@@ -3130,6 +3136,40 @@ function bindMd(md,q){
   const M=md.seatNo, act=(o)=>send({type:"action",targetSeat:M,bySeat:M,toolAction:o});
   q("[data-mdf]").forEach(b=>b.onclick=()=>{const f=b.dataset.mdf;if(f===(md.chosenFaction||"蜀"))return;act({type:"mdFaction",faction:f==="蜀"?null:f});});
   q("[data-mdreset]").forEach(b=>b.onclick=()=>{if(confirm("重开?势力回到蜀,清空记录。"))act({type:"resetGame"});});
+}
+
+/* ---------- 周群:天候 当前天气台账(全公开)。准备阶段展示牌堆顶,按花色令一名角色获得天气技能直到周群下一准备阶段 ---------- */
+const ZQ_WX={H:["红桃","烈暑"],D:["方片","凝雾"],S:["黑桃","骤雨"],C:["梅花","严霜"]};
+let zqTarget=null;
+function viewZqTool(z){
+  const ts=z.toolState||{}, iAm=state.youHold.includes(z.seatNo), su=ts.suit||null, holder=ts.holder;
+  const dtext=n=>{const l=(DERIVED&&DERIVED["周群"])||[];const x=l.find(d=>d.name===n);return x?x.text:"";};
+  let h=`<div class="card"><h2>周群 · 天候<span class="tag">${su?"当前 "+ZQ_WX[su][1]:"无天气"} · 全公开</span></h2>`;
+  h+=`<div class="hint">锁定技:准备阶段观看牌堆顶的牌(可用一张手牌换掉),然后展示之,按花色令一名角色获得对应技能直到你下一准备阶段。这里记<b>现在生效的天气</b>和<b>谁拿着它</b>。</div>`;
+  if(su){
+    const red=(su==="H"||su==="D");
+    h+=`<div style="margin:10px 0;padding:10px 12px;border:1px solid var(--seal);border-radius:8px;background:rgba(163,46,34,.05)">`
+      +`<div style="font-size:12px;color:var(--ink-soft)">当前天气</div><div style="font-family:var(--display);font-weight:800;font-size:26px;color:${red?"var(--seal)":"var(--ink)"}">${SUIT_CH[su]} ${esc(ZQ_WX[su][1])}</div>`
+      +`<div style="margin-top:4px">由 <b>座位 ${holder} ${esc((seatGeneralName(state.seats[holder]&&state.seats[holder].general)||"").slice(0,8))}</b> 拥有 · 至周群下一准备阶段</div>`
+      +`<div style="margin-top:6px;font-size:13px">${esc(dtext(ZQ_WX[su][1]))}</div></div>`;
+  }else h+=`<div style="text-align:center;margin:12px 0;color:var(--ink-soft)">当前没有生效的天气</div>`;
+  if(iAm){
+    h+=`<div class="row" style="gap:6px;margin-bottom:6px"><span class="hint" style="margin:0;flex:none">给谁</span><select class="pnl-msel" data-zqsel style="flex:1 1 0;min-width:0">`
+      +Object.values(state.seats).filter(s=>s.holderDevices.length).map(s=>`<option value="${s.seatNo}"${String(zqTarget??holder??z.seatNo)===String(s.seatNo)?" selected":""}>座位${s.seatNo} ${esc((seatGeneralName(s.general)||"").slice(0,6))}</option>`).join("")+`</select></div>`;
+    h+=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">`+Object.entries(ZQ_WX).map(([k,[sn,wx]])=>{const red=(k==="H"||k==="D");return `<button class="pick ${su===k?"sel":""}" data-zqset="${k}" style="padding:8px 0;font-weight:700"><span style="font-size:18px;${red&&su!==k?"color:var(--seal)":""}">${SUIT_CH[k]}</span><br>${wx}<br><small style="font-weight:400">${sn}</small></button>`;}).join("")+`</div>`;
+    h+=`<div class="row" style="margin-top:10px;gap:6px"><button class="ghost" data-zqclear="1" style="font-size:12px"${su?"":" disabled"}>我的准备阶段 · 天气结束</button><span class="grow"></span><button class="ghost" data-zqreset="1" style="font-size:12px">重开</button></div>`;
+  }else h+=`<div class="hint">周群本人操作,你只读。</div>`;
+  h+=`</div>`;
+  h+=`<div class="card"><h2>四种天气</h2>`+Object.entries(ZQ_WX).map(([k,[sn,wx]])=>`<div class="skl${su===k?" on":""}" style="margin-bottom:6px${su===k?";border-left:3px solid var(--seal);padding-left:8px":""}"><div class="sn">${SUIT_CH[k]} ${esc(wx)}<span class="stag stag-lock">锁定技</span><span class="hint" style="margin:0 0 0 6px">${esc(sn)}</span></div><div style="font-size:13px">${esc(dtext(wx))}</div></div>`).join("")+`</div>`;
+  if(ts.log&&ts.log.length) h+=`<div class="card"><h2>记录</h2><div class="loglist">`+ts.log.slice(0,20).map(l=>`<div>${esc(l)}</div>`).join("")+`</div></div>`;
+  return h;
+}
+function bindZq(z,q){
+  const Z=z.seatNo, act=(o)=>send({type:"action",targetSeat:Z,bySeat:Z,toolAction:o});
+  q("[data-zqsel]").forEach(s=>s.onchange=()=>{zqTarget=s.value;});
+  q("[data-zqset]").forEach(b=>b.onclick=()=>{const sel=document.querySelector("[data-zqsel]");const tg=+(sel?sel.value:Z);act({type:"zqSet",suit:b.dataset.zqset,targetSeat:tg});});
+  q("[data-zqclear]").forEach(b=>b.onclick=()=>act({type:"zqClear"}));
+  q("[data-zqreset]").forEach(b=>b.onclick=()=>{if(confirm("重开天候台账?"))act({type:"resetGame"});});
 }
 
 const LYS_TRICKS=["无中生有","过河拆桥","顺手牵羊","决斗","借刀杀人","火攻","知己知彼","远交近攻","调虎离山"];

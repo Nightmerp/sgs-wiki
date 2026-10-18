@@ -136,6 +136,7 @@ export const TOOL_NAMES = {
   "晋司马懿": "jinsimayi",   // OL 已收录(id7003);花色台账(权变,按出牌阶段)
   "司马昭": "simazhao",      // OL 已收录(id7004);花色台账(昭然,按出牌阶段)
   "界吕蒙": "jielvmeng",     // OL 已收录(id306);花色台账(博图,按回合)
+  "周群": "zhouqun",         // OL 已收录(id543);天候当前天气台账
   "孟达": "mengda",          // OL 已收录(id558);苟得变更势力(写 seat.chosenFaction)
   "戏志才": "xizhicai",      // OL 已收录(id375);先辅秘密目标(保密)
   "神张角": "shenzhangjiao", // OL 已收录(id227);异兆「黄」计数器,tool 直写 generals.json,此处防重爬丢失

@@ -1,6 +1,6 @@
 # SGS-Wiki 线下房间 · 交接文档
 
-> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **846 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
+> 给新对话接续用。新会话可直接让我 **读 `docs/room-protocol.md` + 本文件 + `prototype/`**,并跑 `node prototype/sgs/room-sim.mjs`(应 **857 passed**)+ `node prototype/sgs/deck-test.mjs`(应 26 passed)+ `node prototype/fengsheng/fs-sim.mjs`(应 72 passed)确认基线,即可继续。
 
 ## ⭐⭐ 2026-09-24:多游戏架构 + 风声(游卡典藏版)房间 v1 —— 新会话先读这段,再读下面三国杀状态
 
@@ -24,11 +24,11 @@
 
 ## ⭐ 最新状态(2026-09-22,graduate + 3 新将 + 谋程昱工具 + 神典韦池扩到 33,全部 push 到 main)—— 新会话先读这段
 
-**基线**:`node prototype/sgs/room-sim.mjs` → **846 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
+**基线**:`node prototype/sgs/room-sim.mjs` → **857 passed**;`node prototype/sgs/deck-test.mjs` → **26 passed**。
 
 **规模**:武将库 **711 将**(696 OL = 官网花名册全量 + 15 手录/线下,含《不臣之君》3 模式将)· 房间工具 **24 个** · 装备库 **58 张** · 选将支持拼音。
 
-**34 个工具**:魔吕布 / 南华老仙 / 族荀攸 / 谋黄月英 / 魔曹操 / 袁姬 / 钟琰 / 魔司马懿 / 谋董昭 / 神孙权 / 魔貂蝉 / 魔孙权 / 神典韦 / 李傕 / 徐荣 / SP徐氏 / 郭照 / 裴秀 / 蒲元 / 曹婴(伏间随机目标) / 族王明山(剩墨台账+弹雀点数) / 贾充(凶竖秘密猜测,保密) / 族陆郁生(拾昔四花色台账) / 谋程昱(胆持跨座位秘密选类型,保密)/ 神张角(异兆「黄」计数)/ 谢灵毓(元嫡牌名组台账,技能描述随之改写)/ 谋小乔·族荀采·谋董卓·晋司马懿·司马昭·界吕蒙(花色台账,共用一套)/ 戏志才(先辅秘密目标,保密)/ 孟达(苟得变更势力)。
+**35 个工具**:魔吕布 / 南华老仙 / 族荀攸 / 谋黄月英 / 魔曹操 / 袁姬 / 钟琰 / 魔司马懿 / 谋董昭 / 神孙权 / 魔貂蝉 / 魔孙权 / 神典韦 / 李傕 / 徐荣 / SP徐氏 / 郭照 / 裴秀 / 蒲元 / 曹婴(伏间随机目标) / 族王明山(剩墨台账+弹雀点数) / 贾充(凶竖秘密猜测,保密) / 族陆郁生(拾昔四花色台账) / 谋程昱(胆持跨座位秘密选类型,保密)/ 神张角(异兆「黄」计数)/ 谢灵毓(元嫡牌名组台账,技能描述随之改写)/ 谋小乔·族荀采·谋董卓·晋司马懿·司马昭·界吕蒙(花色台账,共用一套)/ 戏志才(先辅秘密目标,保密)/ 孟达(苟得变更势力)/ 周群(天候当前天气)。
 
 **房间级功能(已上线代码)**:
 - 全场状态面板:血量/翻面/连环/阵亡(横置已并入连环);残血起手将按 initialHp 播种
@@ -84,7 +84,7 @@
 
 ## ✅ 身份自动发放 + 发将武将锁定 + 新一局(2026-10-01,待 deploy)
 
-**基线**:room-sim **846**。
+**基线**:room-sim **857**。
 
 **发将亮出的武将锁定**:`seat.genLocked`(dealPick 君主 / dealReveal 落座时置 true)→ `setGeneral` 拒 `GENERAL_LOCKED`,座位卡不再给「选武将 ▾」。手动选将的座位不锁、下拉照旧。解锁 = 重新发将(参与座位)/ 发身份时清空武将 / 房间设置「🔄 新一局」(`newGame`:清全场武将+身份+进行中的发将,座位与持有者不动)。
 
@@ -115,7 +115,13 @@
 
 **⚠ Cloudflare 免费额度告警(2026-10-06)→ DO WebSocket 改休眠模式(`common/room-do.mjs`,待 deploy)**:邮件「Durable Objects daily operation limit 90%」超的是 **duration(GB·s)** 不是请求数。原因:原先 `ws.accept()+addEventListener` 是非休眠 WebSocket,只要有一个连接挂着(手机后台留着页面、客户端自动重连)DO 就常驻内存按时长计费;免费额度 13,000 GB·s/天 ≈ 一个 128MB DO 活 29 小时,几间房各挂一台手机就超。现改为 **Hibernation API**:`state.acceptWebSocket(ws)` + `webSocketMessage/webSocketClose/webSocketError` 回调;连接↔deviceId 存 `ws.serializeAttachment({d})`(不能存 this 上,休眠会丢);`sockets()=state.getWebSockets()`;`this.core` 休眠后为 null 由 ensureCore 回灌;没人在线时 onClose 不回灌 core(让 DO 尽快空闲)。三国杀/风声共用同一基类,行为不变(本地双标签验过 认领/改名/广播/断线重连/解散/风声)。⚠ 本地 wrangler dev 里客户端直接关页面会打一行 `Uncaught Error: Network connection lost`——是运行时对异常断开的日志,无害。**deploy 后用量看**:dash.cloudflare.com → Workers & Pages → Durable Objects → 看 Duration 曲线应明显掉下来;若还高,再查 alarm/其它。
 
-**⭐ 2026-10-18 临时 ban 每人 2 个(≤6 人)+ 孟达变更势力工具(**34 工具**,room-sim **846**,待 deploy)**:
+**⭐ 2026-10-18 隐匿登场 + 周群天候工具 + 秦朗技能(**35 工具**,room-sim **857**,待 deploy)**:
+- **隐匿武将**(晋势力 9 将:宣公主/夏侯徽/司马师/晋司马懿/司马昭/王元姬/晋张春华/羊徽瑜/司马炎;判定=技能文本以「隐匿」开头,worker `setHeroInfo` 贴 `yinni`;曹爽托孤只是提到隐匿不算):`_applyGeneral` 时 `seat.hidden=true`、hp/hpMax=1(服务端直接设,客户端不播种)。`_seatView` 对非持有者返回 `general:"hidden"`(势力/皮肤/工具/toolState 全藏),持有者见真名 + `hidden:true`;发将「已亮出」里别人只见「隐匿武将」;历史记录也写「隐匿武将」直到登场。`revealHidden{seatNo}`(持有者):hidden=false、hpMax/hp 回到武将数值(**受伤登场的那 1 点伤害之后手动扣**,隐匿技线下发动)。客户端:别人座位标「🙈 隐匿 · 未登场」,自己座位标「隐匿中(仅你可见)」+「登场」按钮。手动选将/发将/君主亮出 三条路都走 `_applyGeneral`,行为一致。
+- **周群「天候」**(tool `zhouqun`,543):`{suit,holder}` 公开台账,`zqSet{suit,targetSeat}` / `zqClear` / `resetGame`;客户端显示当前天气大字 + 拥有者 + 四天气文本(来自 derived-skills.json 周群条目)。
+- **秦朗 639**:官网只有占位空技能 → `SKILL_OVERRIDES[639].skillsReplace`(整组替换,applyOverrides 新支持)填 olwiki「贤膺」。
+- **PR #2(Nightmerp,EN 术语)**:review 意见见对话;结论=方向可以但要补全(docs 示例/non-attacking/unique suit),由用户定夺合并。
+
+(≤6 人)+ 孟达变更势力工具(**34 工具**,room-sim **846**,待 deploy)**:
 - 临时 ban:`DEAL_TEMPBAN_SMALL=6`(deal.mjs),人数 ≤6 → 每人 ban 2 个,否则 1 个;`deal.ban.n`,`picked[座位]` 改为数组,视图 `banN/banLeft`、`seats[n].ban` 为数组。候选数 k 规则不变(min(5, 池÷人数),≥3 才能开;3 个候选 ban 2 个可以)。弹层 ban 完第一个不关,继续 ban 第二个。
 - **孟达「苟得·变更势力」**(tool `mengda`,558 直写 + TOOL_NAMES):`mdFaction{faction|null}` 直接写 `seat.chosenFaction`(null=回本势力蜀),全公开;换将/重开重置。客户端:非神将有 chosenFaction 时座位标 `蜀→魏`、查将/立绘同步显示;全场面板的势力 `panelFac` 本来就读 chosenFaction。
 

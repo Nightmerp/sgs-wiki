@@ -26,6 +26,10 @@ export const SKILL_OVERRIDES = {
   769: { note: "谢灵毓 元嫡 {0} 占位 → 【杀】【闪】【桃】", skills: {
     "元嫡": "锁定技，当每回合首次有【杀】【闪】【桃】为一组的牌名均进入过弃牌堆后，你摸一张牌。若其中有牌不因使用进入弃牌堆，且剩余牌名大于一，你移除一个牌名。",
   } },
+  // 秦朗(639):官网详情页只有占位「技能:(空)」,技能从 olwiki 抄(2026-10-18,用户报「秦朗没有技能描述」);skillsReplace 整组替换,重爬不丢
+  639: { note: "秦朗 贤膺 官网空占位 → olwiki 文本", skillsReplace: [
+    { name: "贤膺", effect: "准备阶段或当你受到伤害后，你可以摸两张牌并弃置任意张牌（不能是本轮以此法弃置过的张数），若弃置牌同名，你可以于本回合结束时视为使用之。" },
+  ] },
   // SP赵云 本桌测试版(用户 2026-10-18,后续可能改回):体力上限 3→4;「冲阵」改为 龙胆使用/打出时 二选一(获得手牌 / 造成 1 点伤害)+ 令其失去最后手牌或濒死则摸两张
   108: { note: "SP赵云 测试版:上限 4;冲阵改写", hp: 4, cardWarn: "本桌测试版:体力上限 3→4;〖冲阵〗改为可二选一(获得手牌 / 造成 1 点伤害)并有摸两张的奖励。以本房间描述为准,后续可能改回", skills: {
     "冲阵": "每当你发动“龙胆”使用或打出一张手牌时，你可以立即获得对方的一张手牌或对对方造成1点伤害。若其因此失去最后一张手牌或进入濒死状态，你摸两张牌。（测试版：原为 当你发动“龙胆”时，你可以获得对方的一张手牌；体力上限原为3）",
@@ -326,6 +330,7 @@ export function applyOverrides(list, warn = (m) => console.warn(m)) {
     if (!ov) continue;
     if (ov.cardWarn) h.cardWarn = ov.cardWarn; else delete h.cardWarn; // ① 技能修正提示(幂等:去掉 cardWarn 的将 rebake 时清除旧标记)
     if (ov.hp != null) h.hp = ov.hp; // 体力上限覆盖(测试版房规用,如 SP赵云 3→4;删掉该条 rebake 会被官网原值覆盖回去)
+    if (ov.skillsReplace) { h.skills = ov.skillsReplace.map((x) => ({ ...x })); skillHits += h.skills.length; } // 整组替换(官网占位空技能的将,如 秦朗 639)
     for (const [sn, eff] of Object.entries(ov.skills || {})) {
       const s = (h.skills || []).find((x) => x.name === sn);
       if (s) { s.effect = eff; skillHits++; }
