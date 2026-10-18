@@ -118,6 +118,7 @@
 **⭐ 2026-10-18 隐匿登场 + 周群天候工具 + 秦朗技能(**35 工具**,room-sim **857**,待 deploy)**:
 - **隐匿武将**(晋势力 9 将:宣公主/夏侯徽/司马师/晋司马懿/司马昭/王元姬/晋张春华/羊徽瑜/司马炎;判定=技能文本以「隐匿」开头,worker `setHeroInfo` 贴 `yinni`;曹爽托孤只是提到隐匿不算):`_applyGeneral` 时 `seat.hidden=true`、hp/hpMax=1(服务端直接设,客户端不播种)。`_seatView` 对非持有者返回 `general:"hidden"`(势力/皮肤/工具/toolState 全藏),持有者见真名 + `hidden:true`;发将「已亮出」里别人只见「隐匿武将」;历史记录也写「隐匿武将」直到登场。`revealHidden{seatNo}`(持有者):hidden=false、hpMax/hp 回到武将数值(**受伤登场的那 1 点伤害之后手动扣**,隐匿技线下发动)。客户端:别人座位标「🙈 隐匿 · 未登场」,自己座位标「隐匿中(仅你可见)」+「登场」按钮。手动选将/发将/君主亮出 三条路都走 `_applyGeneral`,行为一致。
 - **周群「天候」**(tool `zhouqun`,543):`{suit,holder}` 公开台账,`zqSet{suit,targetSeat}` / `zqClear` / `resetGame`;客户端显示当前天气大字 + 拥有者 + 四天气文本(来自 derived-skills.json 周群条目)。
+- **OL 动态占位 `{0}{1}`**:官网/olwiki 技能文本里 `{n}` 是客户端运行时填的动态内容(谋黄月英理贤={0}时机/{1}并才加的牌名;薛灵芸思泣={0}数字;谢灵毓元嫡={0}牌名图标组)。实体卡没有 → 用 SKILL_OVERRIDES 写成卡面文本。**薛灵芸思泣的数字待用户对卡**(现写 X + cardWarn)。新将录入后 `grep "{0}"` 一下。
 - **秦朗 639**:官网只有占位空技能 → `SKILL_OVERRIDES[639].skillsReplace`(整组替换,applyOverrides 新支持)填 olwiki「贤膺」。
 - **PR #2(Nightmerp,EN 术语)**:review 意见见对话;结论=方向可以但要补全(docs 示例/non-attacking/unique suit),由用户定夺合并。
 
