@@ -63,7 +63,7 @@ Use these house translations so every hero reads as one voice. If you hit a term
 
 **Conventions:**
 - Keep the **skill name in Chinese** (the friend sees the Chinese name on the physical card). Only the effect text becomes English.
-- It's fine (and consistent with existing entries) for the English to begin with the tag word, e.g. `"Compulsory Skill. ..."`, even though a colored `锁定技` chip also shows.
+- It's fine (and consistent with existing entries) for the English to begin with the tag word, e.g. `"Mandatory Skill. ..."`, even though a colored `锁定技` chip also shows.
 - Keep card names in 【】 brackets, e.g. `【Slash】` or leave the Chinese `【杀】` — match how neighboring entries do it; when in doubt keep the Chinese card name in 【】 so it maps to the physical card.
 
 ---
@@ -93,9 +93,9 @@ Find `export const SKILL_EN = { ... }` and add one block. Use backtick strings (
 ```js
 export const SKILL_EN = {
   544: { // 张华   ← id + a comment with the hero name
-    "弼昏": `Compulsory Skill. When you use a card that targets another character, if your hand size exceeds your hand limit, cancel that use, and the sole target gains that card.`,
+    "弼昏": `Mandatory Skill. When you use a card that targets another character, if your hand size exceeds your hand limit, cancel that use, and the sole target gains that card.`,
     "剑合": `During your Play phase, once per character: ...`,
-    "穿屋": `Compulsory Skill. After you deal or take damage, ...`,
+    "穿屋": `Mandatory Skill. After you deal or take damage, ...`,
   },
   // ... add your new hero id block here ...
 };
@@ -143,7 +143,7 @@ Shape: `{ "<heroKey>": { "<entryName>": "<English>" } }`. Example (already in th
 ```json
 {
   "张芝": {
-    "飞白": "Transform Skill, Compulsory Skill. Yang: when a non-black card of yours deals damage, that damage is increased by 1. Yin: when a non-red card of yours restores HP, that recovery is increased by 1."
+    "飞白": "Transform Skill, Mandatory Skill. Yang: when a non-black card of yours deals damage, that damage is increased by 1. Yin: when a non-red card of yours restores HP, that recovery is increased by 1."
   },
   "谋庞统": {
     "飞军": "Once per Play phase, you may discard a card, then choose one: ...",
@@ -204,7 +204,7 @@ node -e 'const g=require("./prototype/sgs/shared/generals.json");const h=g.find(
 # -> id 524, skills 蹈节 / 烈誓 / 点盏 / 还阴
 
 # 2. add to SKILL_EN in generals-overrides.mjs:
-#    524: { "蹈节": `Clan Skill, Compulsory Skill. ...`, "烈誓": `...`, "点盏": `...`, "还阴": `...` },
+#    524: { "蹈节": `Clan Skill, Mandatory Skill. ...`, "烈誓": `...`, "点盏": `...`, "还阴": `...` },
 
 # 3. re-bake + verify
 node prototype/sgs/rebake-overrides.mjs        # enHits should increase by 4, exit 0
